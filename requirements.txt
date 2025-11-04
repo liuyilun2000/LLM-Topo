@@ -1,0 +1,37 @@
+# Core dependencies (required)
+numpy==2.3.4
+matplotlib==3.10.7
+pandas==2.3.3
+scikit-learn==1.7.2
+torch==2.9.0
+transformers==4.57.1
+accelerate==1.11.0
+datasets==4.3.0
+tqdm==4.67.1
+
+# Optional dependencies for advanced features
+# Uncomment as needed:
+
+# Dimensionality reduction
+umap-learn==0.5.9.post2
+
+# Topological data analysis (persistent homology)
+ripser==0.6.12
+persim==0.3.8
+
+# Interactive visualizations
+plotly==6.3.1
+
+# Model utilities
+safetensors==0.6.2
+
+# CLI utilities (optional - used in test.py)
+fire==0.7.1
+requests==2.32.5
+
+# Visualization enhancements (optional)
+seaborn==0.13.2
+
+# 3D animation (optional - only for manim/ scripts)
+# manim  # Uncomment if you need Manim animations
+

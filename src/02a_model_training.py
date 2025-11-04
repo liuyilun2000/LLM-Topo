@@ -1,0 +1,356 @@
+"""
+Train a Llama model on graph walk sequences
+"""
+import argparse
+import json
+import os
+import torch
+from pathlib import Path
+
+from datasets import load_from_disk
+from transformers import (
+    LlamaConfig,
+    LlamaForCausalLM,
+    PreTrainedTokenizer,
+    Trainer,
+    TrainingArguments,
+)
+from torch.utils.data import Dataset
+
+
+# HuggingFace tokenizer for graph walks
+class GraphWalkTokenizer(PreTrainedTokenizer):
+    """Tokenizer that treats each graph node ID as a token"""
+    model_input_names = ["input_ids", "attention_mask"]
+    
+    def __init__(self, vocab_size, **kwargs):
+        self._vocab_size = vocab_size
+        self._vocab = {str(i): i for i in range(vocab_size)}
+        self._id_to_token = {i: str(i) for i in range(vocab_size)}
+        super().__init__(**kwargs)
+    
+    @property
+    def vocab_size(self):
+        return self._vocab_size
+    
+    def get_vocab(self):
+        return self._vocab.copy()
+    
+    def _tokenize(self, text, **kwargs):
+        """Split text into tokens (space-separated numbers)"""
+        return text.split()
+    
+    def _convert_token_to_id(self, token):
+        """Convert a token (string) to an id (integer)"""
+        return int(token)
+    
+    def _convert_id_to_token(self, index):
+        """Convert an id (integer) to a token (string)"""
+        return str(index)
+    
+    def convert_tokens_to_string(self, tokens):
+        """Convert a sequence of tokens to a single string"""
+        return " ".join(tokens)
+    
+    def save_vocabulary(self, save_directory, filename_prefix=None):
+        """Save the vocabulary to a directory"""
+        if not os.path.isdir(save_directory):
+            os.makedirs(save_directory)
+        
+        vocab_file = os.path.join(
+            save_directory,
+            (filename_prefix + "-" if filename_prefix else "") + "vocab.json"
+        )
+        
+        with open(vocab_file, 'w') as f:
+            json.dump(self._vocab, f, indent=2)
+        
+        return (vocab_file,)
+    
+    def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
+        """No special tokens, just return the input as-is"""
+        if token_ids_1 is None:
+            return token_ids_0
+        return token_ids_0 + token_ids_1
+
+
+# Custom data collator for graph walks
+class GraphWalkDataCollator:
+    """Collator that pads sequences and creates attention masks"""
+    def __init__(self, pad_token_id=0, max_seq_length=None):
+        self.pad_token_id = pad_token_id
+        self.max_seq_length = max_seq_length
+    
+    def __call__(self, features):
+        # Get max length in batch
+        batch_max_length = max(len(f['input_ids']) for f in features)
+        
+        # If max_seq_length is set, use it; otherwise use batch max
+        max_length = self.max_seq_length if self.max_seq_length else batch_max_length
+        
+        input_ids = []
+        labels = []
+        attention_mask = []
+        
+        for f in features:
+            seq_len = len(f['input_ids'])
+            
+            # Truncate if needed
+            if seq_len > max_length:
+                seq = f['input_ids'][:max_length]
+            else:
+                seq = f['input_ids']
+            
+            padding_length = max_length - len(seq)
+            
+            # Pad input_ids
+            padded_input = seq + [self.pad_token_id] * padding_length
+            input_ids.append(padded_input)
+            
+            # Pad labels (use -100 for padding tokens so they're ignored in loss)
+            padded_labels = seq + [-100] * padding_length
+            labels.append(padded_labels)
+            
+            # Create attention mask
+            mask = [1] * len(seq) + [0] * padding_length
+            attention_mask.append(mask)
+        
+        return {
+            'input_ids': torch.tensor(input_ids, dtype=torch.long),
+            'labels': torch.tensor(labels, dtype=torch.long),
+            'attention_mask': torch.tensor(attention_mask, dtype=torch.long)
+        }
+
+
+def count_parameters(model):
+    """Count model parameters with embedding breakdown"""
+    total_params = 0
+    trainable_params = 0
+    embedding_params = 0
+    non_embedding_params = 0
+    
+    for name, param in model.named_parameters():
+        num_params = param.numel()
+        total_params += num_params
+        
+        if param.requires_grad:
+            trainable_params += num_params
+        
+        if 'embed_tokens' in name or 'lm_head' in name:
+            embedding_params += num_params
+        else:
+            non_embedding_params += num_params
+    
+    return total_params, trainable_params, embedding_params, non_embedding_params
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Train Llama on graph walks')
+    parser.add_argument('--dataset_dir', type=str, default='./prepared_dataset',
+                      help='Directory with prepared dataset')
+    parser.add_argument('--config', type=str, default='config_400K_llama.json',
+                      help='Model config JSON file')
+    parser.add_argument('--output_dir', type=str, default='./output',
+                      help='Output directory for model and checkpoints')
+    parser.add_argument('--epochs', type=int, default=3,
+                      help='Number of training epochs')
+    parser.add_argument('--batch_size', type=int, default=2,
+                      help='Per-device batch size')
+    parser.add_argument('--gradient_accumulation_steps', type=int, default=4,
+                      help='Gradient accumulation steps')
+    parser.add_argument('--learning_rate', type=float, default=5e-4,
+                      help='Learning rate')
+    parser.add_argument('--max_length', type=int, default=128,
+                      help='Maximum sequence length')
+    parser.add_argument('--save_steps', type=int, default=50,
+                      help='Save checkpoint every N steps')
+    parser.add_argument('--eval_steps', type=int, default=50,
+                      help='Evaluate every N steps')
+    parser.add_argument('--logging_steps', type=int, default=10,
+                      help='Log every N steps')
+    parser.add_argument('--logging_dir', type=str, default=None,
+                      help='Directory for logs (default: {output_dir}/logs)')
+    parser.add_argument('--no_cuda', action='store_true',
+                      help='Force CPU training')
+    
+    args = parser.parse_args()
+    
+    # Check CUDA availability
+    cuda_available = torch.cuda.is_available()
+    
+    print("="*60)
+    print("Graph Walk Model Training")
+    print("="*60)
+    
+    # Device information
+    print(f"\nDevice availability:")
+    print(f"  CUDA available: {cuda_available}")
+    if cuda_available:
+        print(f"  CUDA device: {torch.cuda.get_device_name(0)}")
+        print(f"  CUDA device count: {torch.cuda.device_count()}")
+    
+    # Override no_cuda if CUDA is not available and user didn't explicitly request CPU
+    if args.no_cuda:
+        actual_device = "CPU"
+    elif not cuda_available:
+        print(f"\nWarning: CUDA not available, falling back to CPU")
+        args.no_cuda = True
+        actual_device = "CPU"
+    else:
+        actual_device = "GPU"
+    
+    # Load dataset
+    print(f"\nLoading dataset from {args.dataset_dir}")
+    dataset = load_from_disk(args.dataset_dir)
+    print(f"  Train samples: {len(dataset['train'])}")
+    if 'validation' in dataset:
+        print(f"  Validation samples: {len(dataset['validation'])}")
+    
+    # Load vocabulary info
+    vocab_info_path = Path(args.dataset_dir) / 'vocab_info.json'
+    with open(vocab_info_path, 'r') as f:
+        vocab_info = json.load(f)
+    vocab_size = vocab_info['vocab_size']
+    print(f"\nVocabulary size: {vocab_size}")
+    
+    # Create tokenizer
+    print(f"\nCreating tokenizer...")
+    tokenizer = GraphWalkTokenizer(vocab_size)
+    print(f"  Tokenizer vocab size: {tokenizer.vocab_size}")
+    
+    # Load model config
+    print(f"\nLoading config from {args.config}")
+    config = LlamaConfig.from_json_file(args.config)
+    config.vocab_size = vocab_size
+    
+    # Set max_position_embeddings if not in config
+    if not hasattr(config, 'max_position_embeddings') or config.max_position_embeddings is None:
+        config.max_position_embeddings = 2048
+    
+    # Set rope_theta if not set
+    if not hasattr(config, 'rope_theta'):
+        config.rope_theta = 10000.0
+    
+    print(f"  Hidden size: {config.hidden_size}")
+    print(f"  Num layers: {config.num_hidden_layers}")
+    print(f"  Num heads: {config.num_attention_heads}")
+    print(f"  Intermediate size: {config.intermediate_size}")
+    print(f"  Max position embeddings: {config.max_position_embeddings}")
+    print(f"  Rope theta: {config.rope_theta}")
+    
+    # Initialize model
+    print(f"\nInitializing model...")
+    model = LlamaForCausalLM(config)
+    
+    # Count parameters
+    total, trainable, emb, non_emb = count_parameters(model)
+    print(f"\nModel parameters:")
+    print(f"  Total: {total:,} ({total/1e6:.2f}M)")
+    print(f"  Trainable: {trainable:,} ({trainable/1e6:.2f}M)")
+    print(f"  Embedding: {emb:,} ({emb/1e6:.2f}M)")
+    print(f"  Non-embedding: {non_emb:,} ({non_emb/1e6:.2f}M)")
+    print(f"  Non-emb ratio: {non_emb/total*100:.1f}%")
+    
+    # Truncate sequences if needed
+    def truncate_sequences(examples):
+        examples['input_ids'] = [
+            seq[:args.max_length] for seq in examples['input_ids']
+        ]
+        return examples
+    
+    dataset = dataset.map(truncate_sequences, batched=True)
+    
+    # Setup training arguments
+    print(f"\n{'='*60}")
+    print("Training configuration:")
+    print(f"{'='*60}")
+    
+    training_args = TrainingArguments(
+        output_dir=args.output_dir,
+        overwrite_output_dir=True,
+        num_train_epochs=args.epochs,
+        per_device_train_batch_size=args.batch_size,
+        per_device_eval_batch_size=args.batch_size,
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
+        eval_strategy="steps" if 'validation' in dataset else "no",
+        eval_steps=args.eval_steps if 'validation' in dataset else None,
+        save_strategy="steps",
+        save_steps=args.save_steps,
+        save_total_limit=2,
+        logging_steps=args.logging_steps,
+        learning_rate=args.learning_rate,
+        warmup_steps=50,
+        weight_decay=0.01,
+        logging_dir=args.logging_dir if args.logging_dir else f"{args.output_dir}/logs",
+        no_cuda=args.no_cuda,
+        report_to="none",
+        fp16=False,
+        load_best_model_at_end='validation' in dataset,
+        metric_for_best_model="loss" if 'validation' in dataset else None,
+    )
+    
+    print(f"  Device: {actual_device}")
+    print(f"  Epochs: {args.epochs}")
+    print(f"  Batch size: {args.batch_size}")
+    print(f"  Gradient accumulation: {args.gradient_accumulation_steps}")
+    print(f"  Effective batch size: {args.batch_size * args.gradient_accumulation_steps}")
+    print(f"  Learning rate: {args.learning_rate}")
+    print(f"  Max sequence length: {args.max_length}")
+    print(f"  Save steps: {args.save_steps}")
+    print(f"  Eval steps: {args.eval_steps if 'validation' in dataset else 'N/A'}")
+    print(f"  Logging steps: {args.logging_steps}")
+    print(f"  Logging dir: {args.logging_dir if args.logging_dir else f'{args.output_dir}/logs'}")
+    
+    # Create data collator
+    data_collator = GraphWalkDataCollator(
+        pad_token_id=0,
+        max_seq_length=args.max_length
+    )
+    
+    # Initialize trainer
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=dataset['train'],
+        eval_dataset=dataset.get('validation'),
+        data_collator=data_collator,
+        tokenizer=tokenizer,
+    )
+    
+    # Verify device placement
+    model_device = next(model.parameters()).device
+    print(f"  Model device: {model_device}")
+    if not args.no_cuda and cuda_available:
+        if model_device.type != 'cuda':
+            print(f"  WARNING: Model is not on CUDA device despite CUDA being available!")
+        else:
+            print(f"  ✓ Model successfully placed on GPU")
+    elif args.no_cuda or not cuda_available:
+        if model_device.type != 'cpu':
+            print(f"  WARNING: Model device mismatch!")
+        else:
+            print(f"  ✓ Model correctly using CPU")
+    
+    # Train
+    print(f"\n{'='*60}")
+    print("Starting training...")
+    print(f"{'='*60}\n")
+    
+    trainer.train()
+    
+    print(f"\n{'='*60}")
+    print("Training complete!")
+    print(f"{'='*60}")
+    
+    # Save model and tokenizer
+    final_output_dir = Path(args.output_dir) / "final_model"
+    print(f"\nSaving model to {final_output_dir}")
+    model.save_pretrained(final_output_dir)
+    tokenizer.save_pretrained(final_output_dir)
+    config.save_pretrained(final_output_dir)
+    print(f"Model, tokenizer, and config saved!")
+
+
+if __name__ == '__main__':
+    main()
+
