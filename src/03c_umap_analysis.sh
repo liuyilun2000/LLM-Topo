@@ -105,7 +105,7 @@ fi
 echo "Applying UMAP..."
 
 if [ "$USE_FUZZY" = "true" ]; then
-    python 03c_umap_analysis.py \
+    python scripts/03c_umap_analysis.py \
         --fuzzy_dir "$FUZZY_DIR" \
         --representation_dir "$REPRESENTATION_DIR" \
         --output_dir "$OUTPUT_DIR" \
@@ -116,7 +116,7 @@ if [ "$USE_FUZZY" = "true" ]; then
         $(if [ "$SAVE_UMAP_RESULT" = "true" ]; then echo "--save_umap_result"; fi) \
         $(if [ "$GENERATE_VISUALIZATIONS" = "true" ]; then echo "--generate_visualizations"; fi)
 else
-    python 03c_umap_analysis.py \
+    python scripts/03c_umap_analysis.py \
         --pca_dir "$PCA_DIR" \
         --representation_dir "$REPRESENTATION_DIR" \
         --output_dir "$OUTPUT_DIR" \

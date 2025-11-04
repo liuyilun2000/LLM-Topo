@@ -70,7 +70,7 @@ if [ ! -d "$PCA_DIR" ] || [ -z "$(ls -A $PCA_DIR/*_pca.npz 2>/dev/null)" ]; then
 fi
 
 echo "Computing fuzzy neighborhood distance matrices..."
-python 03b_fuzzy_neighborhood.py \
+python scripts/03b_fuzzy_neighborhood.py \
     --pca_dir "$PCA_DIR" \
     --output_dir "$OUTPUT_DIR" \
     --n_neighbors "$N_NEIGHBORS" \

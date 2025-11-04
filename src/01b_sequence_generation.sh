@@ -57,7 +57,7 @@ if [ ! -f "$GRAPH_BASE" ]; then
 fi
 
 echo "Generating random walks..."
-python 01b_sequence_generation.py \
+python scripts/01b_sequence_generation.py \
     --graph_dir "${GRAPH_DIR}" \
     --topology "${TOPOLOGY}" --H ${H} --W ${W} \
     --max_length ${MAX_LENGTH} --max_seqs ${MAX_SEQS} \

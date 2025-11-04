@@ -30,7 +30,7 @@ echo "  Output directory: ${GRAPH_DIR}"
 echo ""
 
 echo "Generating graph representation..."
-python 01a_graph_generation.py \
+python scripts/01a_graph_generation.py \
     --H ${H} --W ${W} --topology "${TOPOLOGY}" --neigh ${NEIGH} \
     --output_dir "${GRAPH_DIR}"
 

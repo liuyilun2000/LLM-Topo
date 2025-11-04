@@ -15,9 +15,11 @@ The pipeline consists of four main stages:
 
 ### 1. Configure Environment
 
-All scripts use a centralized configuration file `00_config_env.sh`:
+All scripts use a centralized configuration file `src/00_config_env.sh`. Navigate to the `src/` directory before running scripts:
 
 ```bash
+cd src/
+
 # Default settings (can be overridden)
 export H=30              # Grid height
 export W=40              # Grid width
@@ -27,7 +29,11 @@ export RUN_NAME=2M_llama # Model run identifier
 
 ### 2. Run Complete Pipeline
 
+All scripts should be run from the `src/` directory:
+
 ```bash
+cd src/
+
 # Stage 01: Generate graph and sequences
 ./01a_graph_generation.sh
 ./01b_sequence_generation.sh
@@ -51,7 +57,7 @@ export RUN_NAME=2M_llama # Model run identifier
 
 ### Centralized Configuration
 
-All pipeline scripts source `00_config_env.sh` which provides:
+All pipeline scripts source `src/00_config_env.sh` which provides:
 - `H` (grid height, default: 30)
 - `W` (grid width, default: 40)
 - `TOPOLOGY` (topology type, default: "torus")
@@ -72,9 +78,11 @@ All pipeline scripts source `00_config_env.sh` which provides:
 
 ### Custom Configuration
 
-Override settings using environment variables:
+Override settings using environment variables (run from `src/` directory):
 
 ```bash
+cd src/
+
 # Single override
 H=100 ./01a_graph_generation.sh
 
@@ -91,38 +99,60 @@ export H=60 W=90 TOPOLOGY="torus" RUN_NAME="experiment_1"
 ## Directory Structure
 
 ```
-topo_construct_graph/
-├── 00_config_env.sh              # Centralized configuration
-├── 01a_graph_generation.sh      # Stage 01: Graph generation
-├── 01b_sequence_generation.sh    # Stage 01: Random walk generation
-├── 01c_dataset_preparation.sh   # Stage 01: Dataset preparation
-├── 02a_model_training.sh         # Stage 02: Model training
-├── 02b_representation_extraction.sh  # Stage 02: Extract representations
-├── 03a_pca_analysis.sh           # Stage 03: PCA analysis
-├── 03b_fuzzy_neighborhood.sh    # Stage 03: Fuzzy neighborhood
-├── 03c_umap_analysis.sh         # Stage 03: UMAP analysis
-├── 04a_topology_analysis.sh      # Stage 04: Persistent homology
-├── 04b_persistence_barcode.sh   # Stage 04: Barcode visualization
+LLM-Topo/
+├── src/
+│   ├── 00_config_env.sh              # Centralized configuration
+│   ├── 01a_graph_generation.sh        # Stage 01: Graph generation
+│   ├── 01b_sequence_generation.sh     # Stage 01: Random walk generation
+│   ├── 01c_dataset_preparation.sh    # Stage 01: Dataset preparation
+│   ├── 02a_model_training.sh          # Stage 02: Model training
+│   ├── 02b_representation_extraction.sh  # Stage 02: Extract representations
+│   ├── 03a_pca_analysis.sh           # Stage 03: PCA analysis
+│   ├── 03b_fuzzy_neighborhood.sh      # Stage 03: Fuzzy neighborhood
+│   ├── 03c_umap_analysis.sh           # Stage 03: UMAP analysis
+│   ├── 04a_topology_analysis.sh       # Stage 04: Persistent homology
+│   ├── 04b_persistence_barcode.sh    # Stage 04: Barcode visualization
+│   │
+│   ├── scripts/                       # Python scripts
+│   │   ├── 01a_graph_generation.py
+│   │   ├── 01b_sequence_generation.py
+│   │   ├── 01c_dataset_preparation.py
+│   │   ├── 02a_model_training.py
+│   │   ├── 02b_representation_extraction.py
+│   │   ├── 03a_pca_analysis.py
+│   │   ├── 03b_fuzzy_neighborhood.py
+│   │   ├── 03c_umap_analysis.py
+│   │   ├── 04a_topology_analysis.py
+│   │   ├── 04b_persistence_barcode.py
+│   │   ├── quotient_space_topology.py
+│   │   └── utils.py
+│   │
+│   ├── configs/                      # Model configurations
+│   │   ├── config_400K_llama.json
+│   │   ├── config_2M_llama.json
+│   │   ├── config_6M_llama.json
+│   │   └── config_12M_llama.json
+│   │
+│   ├── results/                      # All outputs (data and analysis)
+│   │   └── {DATASET_NAME}/
+│   │       ├── graph/                 # Graph structures (Stage 01)
+│   │       ├── sequences/             # Random walk sequences (Stage 01)
+│   │       ├── dataset/               # Prepared datasets (Stage 01)
+│   │       └── {RUN_NAME}/            # Run-specific outputs
+│   │           ├── final_model/           # Trained models (Stage 02)
+│   │           ├── token_representations/ # Extracted representations (Stage 02)
+│   │           ├── pca_result/           # PCA results (Stage 03)
+│   │           ├── fuzzy_neighborhood/    # Fuzzy distance matrices (Stage 03)
+│   │           ├── umap_result_*/        # UMAP results (Stage 03)
+│   │           ├── topology_analysis/     # Persistence diagrams (Stage 04)
+│   │           └── persistence_barcode/   # Barcode visualizations (Stage 04)
+│   │
+│   ├── README_01.md                   # Stage 01 documentation
+│   ├── README_02.md                   # Stage 02 documentation
+│   ├── README_03.md                   # Stage 03 documentation
+│   └── README_04.md                   # Stage 04 documentation
 │
-├── configs/                     # Model configurations
-│   ├── config_400K_llama.json
-│   ├── config_2M_llama.json
-│   ├── config_6M_llama.json
-│   └── config_12M_llama.json
-│
-└── results/                     # All outputs (data and analysis)
-    └── {DATASET_NAME}/
-        ├── graph/                  # Graph structures (Stage 01)
-        ├── sequences/              # Random walk sequences (Stage 01)
-        ├── dataset/                # Prepared datasets (Stage 01)
-        └── {RUN_NAME}/             # Run-specific outputs
-            ├── final_model/            # Trained models (Stage 02)
-            ├── token_representations/  # Extracted representations (Stage 02)
-            ├── pca_result/            # PCA results (Stage 03)
-            ├── fuzzy_neighborhood/     # Fuzzy distance matrices (Stage 03)
-            ├── umap_result_*/         # UMAP results (Stage 03)
-            ├── topology_analysis/      # Persistence diagrams (Stage 04)
-            └── persistence_barcode/   # Barcode visualizations (Stage 04)
+└── README.md                          # Main documentation (this file)
 ```
 
 ## Workflow Summary
@@ -132,27 +162,27 @@ topo_construct_graph/
 - Generate random walk sequences
 - Prepare HuggingFace datasets
 
-**See:** [README_01.md](README_01.md)
+**See:** [src/README_01.md](src/README_01.md)
 
 ### Stage 02: Model Training
 - Train Llama models on walk sequences
 - Extract internal representations (hidden states, FFN activations)
 
-**See:** [README_02.md](README_02.md)
+**See:** [src/README_02.md](src/README_02.md)
 
 ### Stage 03: Dimensionality Reduction
 - Apply PCA to reduce dimensionality
 - Compute fuzzy neighborhood distance matrices
 - Apply UMAP for visualization
 
-**See:** [README_03.md](README_03.md)
+**See:** [src/README_03.md](src/README_03.md)
 
 ### Stage 04: Topology Analysis
 - Compute persistent homology using ripser
 - Generate persistence diagrams
 - Visualize persistence barcodes
 
-**See:** [README_04.md](README_04.md)
+**See:** [src/README_04.md](src/README_04.md)
 
 ## Model Configurations
 
@@ -216,6 +246,8 @@ All outputs are stored in `results/{DATASET_NAME}/` structure:
 
 ### Model Not Found
 ```bash
+cd src/
+
 # Check model exists
 ls results/{DATASET_NAME}/{RUN_NAME}/final_model/
 
@@ -225,6 +257,8 @@ ls results/{DATASET_NAME}/{RUN_NAME}/final_model/
 
 ### Memory Issues
 ```bash
+cd src/
+
 # Use smaller model
 CONFIG=configs/config_400K_llama.json ./02a_model_training.sh
 
@@ -253,7 +287,7 @@ pip install plotly
 
 ## Documentation
 
-- [README_01.md](README_01.md) - Data generation (graphs, sequences, datasets)
-- [README_02.md](README_02.md) - Model training and representation extraction
-- [README_03.md](README_03.md) - Dimensionality reduction (PCA, fuzzy neighborhood, UMAP)
-- [README_04.md](README_04.md) - Topology analysis (persistent homology, barcodes)
+- [src/README_01.md](src/README_01.md) - Data generation (graphs, sequences, datasets)
+- [src/README_02.md](src/README_02.md) - Model training and representation extraction
+- [src/README_03.md](src/README_03.md) - Dimensionality reduction (PCA, fuzzy neighborhood, UMAP)
+- [src/README_04.md](src/README_04.md) - Topology analysis (persistent homology, barcodes)

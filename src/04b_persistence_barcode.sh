@@ -42,7 +42,7 @@ if [ ! -d "$TOPOLOGY_DIR" ] || [ -z "$(ls -A $TOPOLOGY_DIR/*_topology.json 2>/de
 fi
 
 echo "Generating persistence barcodes..."
-python 04b_persistence_barcode.py \
+python scripts/04b_persistence_barcode.py \
     --topology_dir "$TOPOLOGY_DIR" \
     --output_dir "$OUTPUT_DIR" \
     --max_bars "$MAX_BARS" \

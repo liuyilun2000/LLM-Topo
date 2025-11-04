@@ -35,7 +35,7 @@ if [ ! -f "$INPUT_CSV" ]; then
 fi
 
 echo "Preparing dataset..."
-python 01c_dataset_preparation.py \
+python scripts/01c_dataset_preparation.py \
     --input_csv "$INPUT_CSV" \
     --output_dir "$DATASET_DIR" \
     --train_split "$TRAIN_SPLIT"
