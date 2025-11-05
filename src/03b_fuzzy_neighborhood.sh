@@ -38,10 +38,6 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Local configuration
-PCA_DIR="${PCA_DIR:-./${WORK_DIR}/pca_result}"
-OUTPUT_DIR="${OUTPUT_DIR:-./${WORK_DIR}/fuzzy_neighborhood}"
-
 # Fuzzy neighborhood parameters
 N_NEIGHBORS="${N_NEIGHBORS:-20}"
 METRIC="${METRIC:-cosine}"
@@ -53,7 +49,7 @@ TARGET_ENTROPY="${TARGET_ENTROPY:-auto}"
 echo ""
 echo "Configuration:"
 echo "  PCA dir: $PCA_DIR"
-echo "  Output dir: $OUTPUT_DIR"
+echo "  Output dir: $FUZZY_NEIGHBORHOOD_DIR"
 echo "  n_neighbors: $N_NEIGHBORS"
 echo "  metric: $METRIC"
 echo "  sym_method: $SYM_METHOD"
@@ -72,7 +68,7 @@ fi
 echo "Computing fuzzy neighborhood distance matrices..."
 python scripts/03b_fuzzy_neighborhood.py \
     --pca_dir "$PCA_DIR" \
-    --output_dir "$OUTPUT_DIR" \
+    --output_dir "$FUZZY_NEIGHBORHOOD_DIR" \
     --n_neighbors "$N_NEIGHBORS" \
     --metric "$METRIC" \
     --sym_method "$SYM_METHOD" \
@@ -85,7 +81,7 @@ echo "=========================================="
 echo "Fuzzy neighborhood computation complete!"
 echo "=========================================="
 echo ""
-echo "Results saved to: $OUTPUT_DIR"
+echo "Results saved to: $FUZZY_NEIGHBORHOOD_DIR"
 echo ""
 echo "Generated files per representation:"
 echo "  - {key}_fuzzy_dist.npz (fuzzy distance matrix)"

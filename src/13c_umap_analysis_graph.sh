@@ -22,11 +22,6 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Local configuration
-
-# Graph directory (contains the original distance matrix)
-GRAPH_DIR="${GRAPH_DIR:-./${DATA_DIR}/graph}"
-
 # UMAP parameters
 UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-6}"
 UMAP_MIN_DIST="${UMAP_MIN_DIST:-0.2}"
@@ -37,7 +32,7 @@ SAVE_UMAP_RESULT="${SAVE_UMAP_RESULT:-true}"
 GENERATE_VISUALIZATIONS="${GENERATE_VISUALIZATIONS:-false}"
 
 # Output directory (includes dimensionality)
-OUTPUT_DIR="${OUTPUT_DIR:-./${WORK_DIR}/umap_result_graph_${UMAP_N_COMPONENTS}d}"
+OUTPUT_DIR="${OUTPUT_DIR:-${MODEL_DIR}/umap_result_graph_${UMAP_N_COMPONENTS}d}"
 
 echo ""
 echo "Configuration:"

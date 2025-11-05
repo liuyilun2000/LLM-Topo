@@ -47,6 +47,21 @@ export RUN_NAME=${RUN_NAME:-"2M_llama"}
 #   - Run-related outputs (models, representations, analyses): {DATASET_NAME}/{RUN_NAME}/
 export WORK_DIR="results/${DATASET_NAME}/${RUN_NAME}"
 export DATA_DIR="results/${DATASET_NAME}"
+export DATASET_DIR="${DATASET_DIR:-${DATA_DIR}/dataset}"
+
+# Graph generation parameters
+export GRAPH_DIR="${GRAPH_DIR:-./${DATA_DIR}/graph}"
+export NEIGH=${NEIGH:-8}
+
+
+#export MODEL_DIR="${MODEL_DIR:-${WORK_DIR}/final_model}" # or checkpoints directory
+export MODEL_DIR="${MODEL_DIR:-${WORK_DIR}/checkpoint-100}"
+export REPRESENTATION_DIR="${REPRESENTATION_DIR:-${MODEL_DIR}/token_representations}"
+export PCA_DIR="${PCA_DIR:-${MODEL_DIR}/pca_result}"
+export FUZZY_NEIGHBORHOOD_DIR="${FUZZY_NEIGHBORHOOD_DIR:-${MODEL_DIR}/fuzzy_neighborhood}"
+export UMAP_DIR="${UMAP_DIR:-${MODEL_DIR}/umap_result}"
+export TOPOLOGY_ANALYSIS_DIR="${TOPOLOGY_ANALYSIS_DIR:-${MODEL_DIR}/topology_analysis}"
+export PERSISTENCE_BARCODE_DIR="${PERSISTENCE_BARCODE_DIR:-${MODEL_DIR}/persistence_barcode}"
 
 # Note: Individual scripts should set their own SCRIPT_DIR based on where they are
 # and use relative paths from that location.

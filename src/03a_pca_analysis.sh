@@ -17,8 +17,6 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
 # Local configuration
-REPRESENTATION_DIR="${REPRESENTATION_DIR:-./${WORK_DIR}/token_representations}"
-OUTPUT_DIR="${OUTPUT_DIR:-./${WORK_DIR}/pca_result}"
 
 # PCA parameters: use either PCA_N_COMPONENTS or PCA_VARIANCE (not both)
 PCA_N_COMPONENTS="${PCA_N_COMPONENTS:-}"
@@ -27,7 +25,7 @@ PCA_VARIANCE="${PCA_VARIANCE:-0.95}"
 echo ""
 echo "Configuration:"
 echo "  Representation dir: $REPRESENTATION_DIR"
-echo "  Output dir: $OUTPUT_DIR"
+echo "  Output dir: $PCA_DIR"
 
 # Check which PCA parameter is set
 if [ -n "$PCA_N_COMPONENTS" ]; then
@@ -52,7 +50,7 @@ fi
 echo "Running PCA analysis..."
 python scripts/03a_pca_analysis.py \
     --representation_dir "$REPRESENTATION_DIR" \
-    --output_dir "$OUTPUT_DIR" \
+    --output_dir "$PCA_DIR" \
     $PCA_OPTION
 
 echo ""
@@ -60,7 +58,7 @@ echo "=========================================="
 echo "PCA analysis complete!"
 echo "=========================================="
 echo ""
-echo "Results saved to: $OUTPUT_DIR"
+echo "Results saved to: $PCA_DIR"
 echo ""
 echo "Generated files per representation:"
 echo "  - {key}_pca.npz (PCA-reduced data)"

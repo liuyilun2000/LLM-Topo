@@ -24,36 +24,31 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Local configuration
-
 # Input mode: "distance_matrix" or "data_representation"
 #  - distance_matrix: Uses fuzzy neighborhood distance matrices
 #  - data_representation: Uses data embeddings (PCA, UMAP, downsampled PCA)
 INPUT_MODE="${INPUT_MODE:-data_representation}"
 
+# Ripser parameters for persistence diagram generation
+RIPSER_THRESH="${RIPSER_THRESH:-}"
+RIPSER_MAXDIM="${RIPSER_MAXDIM:-2}"
+RIPSER_COEFF="${RIPSER_COEFF:-3}"       # Z/kZ 
+
 # For distance_matrix mode
 if [ "$INPUT_MODE" = "distance_matrix" ]; then
-    FUZZY_DIR="${FUZZY_DIR:-./${WORK_DIR}/fuzzy_neighborhood}"
-    REPRESENTATION_DIR=""
+    INPUT_DIR=""
     DATA_TYPE=""
     echo "Input mode: Distance matrix (fuzzy neighborhood distance matrices)"
 # For data_representation mode
 else
-    FUZZY_DIR=""
-    REPRESENTATION_DIR="${REPRESENTATION_DIR:-./${WORK_DIR}/umap_result_6d}"
+    INPUT_DIR="${INPUT_DIR:-${MODEL_DIR}/umap_result_6d}"
     # Data type: 'auto' (detect), 'pca', 'umap', or 'downsampled'
     DATA_TYPE="${DATA_TYPE:-auto}"
     echo "Input mode: Data representation (PCA, UMAP, downsampled PCA)"
-    echo "  Data dir: $REPRESENTATION_DIR"
+    echo "  Data dir: $INPUT_DIR"
     echo "  Data type: $DATA_TYPE"
 fi
 
-OUTPUT_DIR="${OUTPUT_DIR:-./${WORK_DIR}/topology_analysis}"
-
-# Ripser parameters for persistence diagram generation
-RIPSER_THRESH="${RIPSER_THRESH:-}"
-RIPSER_MAXDIM="${RIPSER_MAXDIM:-2}"
-RIPSER_COEFF="${RIPSER_COEFF:-3}"
 
 echo ""
 echo "Configuration:"
@@ -61,10 +56,10 @@ echo "  Input mode: $INPUT_MODE"
 if [ "$INPUT_MODE" = "distance_matrix" ]; then
     echo "  Fuzzy dir: $FUZZY_DIR"
 else
-    echo "  Data dir: $REPRESENTATION_DIR"
+    echo "  Data dir: $INPUT_DIR"
     echo "  Data type: $DATA_TYPE"
 fi
-echo "  Output dir: $OUTPUT_DIR"
+echo "  Output dir: $TOPOLOGY_ANALYSIS_DIR"
 if [ -z "$RIPSER_THRESH" ]; then
     echo "  Ripser threshold: (empty = full filtration)"
 else
@@ -82,8 +77,8 @@ if [ "$INPUT_MODE" = "distance_matrix" ]; then
         exit 1
     fi
 else
-    if [ ! -d "$REPRESENTATION_DIR" ]; then
-        echo "Error: Data representation directory not found: $REPRESENTATION_DIR"
+    if [ ! -d "$INPUT_DIR" ]; then
+        echo "Error: Data representation directory not found: $INPUT_DIR"
         echo "Please run appropriate preprocessing step:"
         echo "  - ./03a_pca_analysis.sh (for PCA)"
         echo "  - ./03c_umap_analysis.sh (for UMAP)"
@@ -91,9 +86,9 @@ else
     fi
     # Check if any relevant files exist
     if [ "$DATA_TYPE" = "umap" ] || [ "$DATA_TYPE" = "auto" ]; then
-        if [ -z "$(ls -A $REPRESENTATION_DIR/*_umap_*d.npz 2>/dev/null)" ]; then
+        if [ -z "$(ls -A $INPUT_DIR/*_umap_*d.npz 2>/dev/null)" ]; then
             if [ "$DATA_TYPE" = "umap" ]; then
-                echo "Error: UMAP results not found in $REPRESENTATION_DIR"
+                echo "Error: UMAP results not found in $INPUT_DIR"
                 echo "Please run ./03c_umap_analysis.sh first"
                 exit 1
             fi
@@ -114,14 +109,14 @@ RIPSER_ARGS="$RIPSER_ARGS --ripser_coeff $RIPSER_COEFF"
 if [ "$INPUT_MODE" = "distance_matrix" ]; then
     # Mode 1: Distance matrix input
     python scripts/04a_topology_analysis.py \
-        --fuzzy_dir "$FUZZY_DIR" \
-        --output_dir "$OUTPUT_DIR" \
+        --fuzzy_dir "$FUZZY_NEIGHBORHOOD_DIR" \
+        --output_dir "$TOPOLOGY_ANALYSIS_DIR" \
         $RIPSER_ARGS
 else
     # Mode 2: Data representation input
     python scripts/04a_topology_analysis.py \
-        --data_dir "$REPRESENTATION_DIR" \
-        --output_dir "$OUTPUT_DIR" \
+        --data_dir "$INPUT_DIR" \
+        --output_dir "$TOPOLOGY_ANALYSIS_DIR" \
         --data_type "$DATA_TYPE" \
         $RIPSER_ARGS
 fi

@@ -17,17 +17,17 @@ source "${SCRIPT_DIR}/00_config_env.sh"
 
 # Local configuration
 CONFIG="${CONFIG:-configs/config_${RUN_NAME}.json}"
-DATASET_DIR="${DATASET_DIR:-./${DATA_DIR}/dataset}"
 OUTPUT_DIR="${OUTPUT_DIR:-./${WORK_DIR}}"
 EPOCHS="${EPOCHS:-1}"
 BATCH_SIZE="${BATCH_SIZE:-50}"
 GRAD_ACCUM="${GRAD_ACCUM:-1}"
 LEARNING_RATE="${LEARNING_RATE:-5e-4}"
 MAX_LENGTH="${MAX_LENGTH:-128}"
-SAVE_STEPS="${SAVE_STEPS:-200}"
-EVAL_STEPS="${EVAL_STEPS:-200}"
+SAVE_STEPS="${SAVE_STEPS:-100}"     # should be integer multiple of eval_steps
+EVAL_STEPS="${EVAL_STEPS:-100}"
 LOGGING_STEPS="${LOGGING_STEPS:-10}"
 LOG_DIR="${LOG_DIR:-${OUTPUT_DIR}}"
+SAVE_TOTAL_LIMIT="${SAVE_TOTAL_LIMIT:-all}"  # Number of checkpoints to keep, or "all" to save all
 USE_CPU="${USE_CPU:-false}"
 
 echo ""
@@ -44,6 +44,7 @@ echo "  Save steps: $SAVE_STEPS"
 echo "  Eval steps: $EVAL_STEPS"
 echo "  Logging steps: $LOGGING_STEPS"
 echo "  Logging dir: $LOG_DIR"
+echo "  Save total limit: $SAVE_TOTAL_LIMIT"
 echo "  Device: $([ "$USE_CPU" = "true" ] && echo "CPU" || echo "GPU")"
 echo ""
 
@@ -70,6 +71,7 @@ if [ "$USE_CPU" = "true" ]; then
         --eval_steps "$EVAL_STEPS" \
         --logging_steps "$LOGGING_STEPS" \
         --logging_dir "$LOG_DIR" \
+        --save_total_limit "$SAVE_TOTAL_LIMIT" \
         --no_cuda
 else
     python scripts/02a_model_training.py \
@@ -84,7 +86,8 @@ else
         --save_steps "$SAVE_STEPS" \
         --eval_steps "$EVAL_STEPS" \
         --logging_steps "$LOGGING_STEPS" \
-        --logging_dir "$LOG_DIR"
+        --logging_dir "$LOG_DIR" \
+        --save_total_limit "$SAVE_TOTAL_LIMIT"
 fi
 
 echo ""

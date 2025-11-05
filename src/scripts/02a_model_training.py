@@ -115,6 +115,8 @@ class GraphWalkDataCollator:
             mask = [1] * len(seq) + [0] * padding_length
             attention_mask.append(mask)
         
+        # Create tensors - Trainer will automatically move them to the correct device
+        # Using stack instead of tensor for better performance
         return {
             'input_ids': torch.tensor(input_ids, dtype=torch.long),
             'labels': torch.tensor(labels, dtype=torch.long),
@@ -170,12 +172,25 @@ def main():
                       help='Log every N steps')
     parser.add_argument('--logging_dir', type=str, default=None,
                       help='Directory for logs (default: {output_dir}/logs)')
+    parser.add_argument('--save_total_limit', type=str, default='2',
+                      help='Maximum number of checkpoints to keep (integer) or "all" to save all checkpoints')
     parser.add_argument('--no_cuda', action='store_true',
                       help='Force CPU training')
     
     args = parser.parse_args()
     
-    # Check CUDA availability
+    # Parse save_total_limit - convert "all" to None, otherwise parse as int
+    if args.save_total_limit.lower() == 'all':
+        save_total_limit = None
+    else:
+        try:
+            save_total_limit = int(args.save_total_limit)
+            if save_total_limit < 1:
+                raise ValueError("save_total_limit must be >= 1 or 'all'")
+        except ValueError as e:
+            raise ValueError(f"Invalid save_total_limit: {args.save_total_limit}. Must be a positive integer or 'all'") from e
+    
+    # Check CUDA availability and initialize if needed
     cuda_available = torch.cuda.is_available()
     
     print("="*60)
@@ -188,6 +203,40 @@ def main():
     if cuda_available:
         print(f"  CUDA device: {torch.cuda.get_device_name(0)}")
         print(f"  CUDA device count: {torch.cuda.device_count()}")
+        print(f"  CUDA current device: {torch.cuda.current_device()}")
+        
+        # Check GPU compute capability
+        try:
+            props = torch.cuda.get_device_properties(0)
+            compute_capability = f"{props.major}.{props.minor}"
+            print(f"  Compute capability: sm_{props.major}{props.minor}")
+            
+            # Check if compute capability is supported
+            # PyTorch stable builds typically support up to sm_90
+            # sm_100, sm_101, sm_102, sm_103, sm_110, sm_120+ require newer builds
+            if props.major >= 10:
+                print(f"\n  ⚠ WARNING: GPU has compute capability sm_{props.major}{props.minor}")
+                print(f"  This GPU architecture may not be supported by your PyTorch build.")
+                print(f"  Current PyTorch version: {torch.__version__}")
+                
+                if props.major >= 12:
+                    print(f"\n  ✗ ERROR: Blackwell architecture (sm_{props.major}{props.minor}) is not supported yet.")
+                    print(f"\n  Solutions:")
+                    print(f"  1. Use CPU training: USE_CPU=true ./02a_model_training.sh")
+                    print(f"  2. Wait for official PyTorch support (check https://pytorch.org/get-started/locally/)")
+                    print(f"\n  Falling back to CPU training...")
+                    args.no_cuda = True
+                    actual_device = "CPU"
+                elif props.major == 10:
+                    print(f"  ⚠ Hopper architecture (sm_{props.major}{props.minor}) may require PyTorch 2.1+")
+                    print(f"  If you encounter errors, try: pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu124")
+        except Exception as e:
+            print(f"  Could not check compute capability: {e}")
+        
+        # Set default device to GPU 0 if using GPU and not falling back to CPU
+        if not args.no_cuda:
+            torch.cuda.set_device(0)
+            print(f"  ✓ CUDA device set to GPU 0")
     
     # Override no_cuda if CUDA is not available and user didn't explicitly request CPU
     if args.no_cuda:
@@ -251,6 +300,13 @@ def main():
     print(f"  Non-embedding: {non_emb:,} ({non_emb/1e6:.2f}M)")
     print(f"  Non-emb ratio: {non_emb/total*100:.1f}%")
     
+    # Report GPU memory before moving model
+    if cuda_available and not args.no_cuda:
+        print(f"\nGPU memory before model placement:")
+        print(f"  Allocated: {torch.cuda.memory_allocated(0) / 1024**3:.2f} GB")
+        print(f"  Reserved: {torch.cuda.memory_reserved(0) / 1024**3:.2f} GB")
+        print(f"  Total: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
+    
     # Truncate sequences if needed
     def truncate_sequences(examples):
         examples['input_ids'] = [
@@ -265,6 +321,9 @@ def main():
     print("Training configuration:")
     print(f"{'='*60}")
     
+    # Determine device for model placement
+    device = torch.device("cuda" if cuda_available and not args.no_cuda else "cpu")
+    
     training_args = TrainingArguments(
         output_dir=args.output_dir,
         overwrite_output_dir=True,
@@ -276,7 +335,7 @@ def main():
         eval_steps=args.eval_steps if 'validation' in dataset else None,
         save_strategy="steps",
         save_steps=args.save_steps,
-        save_total_limit=2,
+        save_total_limit=save_total_limit,
         logging_steps=args.logging_steps,
         learning_rate=args.learning_rate,
         warmup_steps=50,
@@ -287,7 +346,14 @@ def main():
         fp16=False,
         load_best_model_at_end='validation' in dataset,
         metric_for_best_model="loss" if 'validation' in dataset else None,
+        ddp_find_unused_parameters=False,  # Better performance for single GPU
+        dataloader_pin_memory=True if cuda_available and not args.no_cuda else False,  # Faster data loading on GPU
+        dataloader_num_workers=0,  # Avoid multiprocessing issues, let Trainer handle it
     )
+    
+    # Explicitly move model to device before creating trainer
+    print(f"\nMoving model to device: {device}")
+    model = model.to(device)
     
     print(f"  Device: {actual_device}")
     print(f"  Epochs: {args.epochs}")
@@ -297,6 +363,7 @@ def main():
     print(f"  Learning rate: {args.learning_rate}")
     print(f"  Max sequence length: {args.max_length}")
     print(f"  Save steps: {args.save_steps}")
+    print(f"  Save total limit: {'all' if save_total_limit is None else save_total_limit}")
     print(f"  Eval steps: {args.eval_steps if 'validation' in dataset else 'N/A'}")
     print(f"  Logging steps: {args.logging_steps}")
     print(f"  Logging dir: {args.logging_dir if args.logging_dir else f'{args.output_dir}/logs'}")
@@ -319,15 +386,29 @@ def main():
     
     # Verify device placement
     model_device = next(model.parameters()).device
+    print(f"\nDevice verification:")
     print(f"  Model device: {model_device}")
     if not args.no_cuda and cuda_available:
         if model_device.type != 'cuda':
-            print(f"  WARNING: Model is not on CUDA device despite CUDA being available!")
+            print(f"  ✗ WARNING: Model is not on CUDA device despite CUDA being available!")
         else:
             print(f"  ✓ Model successfully placed on GPU")
+            # Report GPU memory after model placement
+            print(f"\nGPU memory after model placement:")
+            print(f"  Allocated: {torch.cuda.memory_allocated(0) / 1024**3:.2f} GB")
+            print(f"  Reserved: {torch.cuda.memory_reserved(0) / 1024**3:.2f} GB")
+            print(f"  Free: {(torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved(0)) / 1024**3:.2f} GB")
+            
+            # Verify CUDA is working
+            try:
+                test_tensor = torch.randn(10, 10).to(device)
+                _ = test_tensor @ test_tensor
+                print(f"  ✓ CUDA operations verified working")
+            except Exception as e:
+                print(f"  ✗ ERROR: CUDA operations failed: {e}")
     elif args.no_cuda or not cuda_available:
         if model_device.type != 'cpu':
-            print(f"  WARNING: Model device mismatch!")
+            print(f"  ✗ WARNING: Model device mismatch!")
         else:
             print(f"  ✓ Model correctly using CPU")
     
@@ -336,7 +417,21 @@ def main():
     print("Starting training...")
     print(f"{'='*60}\n")
     
+    # Additional GPU memory check right before training
+    if cuda_available and not args.no_cuda:
+        print(f"GPU memory before training start:")
+        print(f"  Allocated: {torch.cuda.memory_allocated(0) / 1024**3:.2f} GB")
+        print(f"  Reserved: {torch.cuda.memory_reserved(0) / 1024**3:.2f} GB")
+        print("")
+    
     trainer.train()
+    
+    # Report final GPU memory usage
+    if cuda_available and not args.no_cuda:
+        print(f"\nGPU memory after training:")
+        print(f"  Allocated: {torch.cuda.memory_allocated(0) / 1024**3:.2f} GB")
+        print(f"  Reserved: {torch.cuda.memory_reserved(0) / 1024**3:.2f} GB")
+        print("")
     
     print(f"\n{'='*60}")
     print("Training complete!")

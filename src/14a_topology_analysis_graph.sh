@@ -22,12 +22,13 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
 # Local configuration
+MODEL_DIR="${MODEL_DIR:-./${WORK_DIR}/final_model}"
 
 # Graph directory (contains the original distance matrix)
 GRAPH_DIR="${GRAPH_DIR:-./${DATA_DIR}/graph}"
 
 # Output directory
-OUTPUT_DIR="${OUTPUT_DIR:-./${WORK_DIR}/topology_analysis_graph}"
+OUTPUT_DIR="${OUTPUT_DIR:-${MODEL_DIR}/topology_analysis_graph}"
 
 # Ripser parameters for persistence diagram generation
 RIPSER_THRESH="${RIPSER_THRESH:-}"

@@ -17,9 +17,6 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
 # Local configuration
-GRAPH_DIR="${GRAPH_DIR:-./${DATA_DIR}/graph}"
-NEIGH=${NEIGH:-8}
-
 echo ""
 echo "Configuration:"
 echo "  Topology: ${TOPOLOGY}"

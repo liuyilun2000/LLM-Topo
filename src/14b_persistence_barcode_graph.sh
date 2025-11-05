@@ -21,8 +21,9 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
 # Local configuration
-TOPOLOGY_DIR="${TOPOLOGY_DIR:-./${WORK_DIR}/topology_analysis_graph}"
-OUTPUT_DIR="${OUTPUT_DIR:-./${WORK_DIR}/persistence_barcode_graph}"
+MODEL_DIR="${MODEL_DIR:-./${WORK_DIR}/final_model}"
+TOPOLOGY_DIR="${TOPOLOGY_DIR:-${MODEL_DIR}/topology_analysis_graph}"
+OUTPUT_DIR="${OUTPUT_DIR:-${MODEL_DIR}/persistence_barcode_graph}"
 
 # Barcode parameters
 MAX_BARS="${MAX_BARS:-30}"

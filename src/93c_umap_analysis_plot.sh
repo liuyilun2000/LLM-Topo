@@ -22,9 +22,10 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
 # Local configuration
+MODEL_DIR="${MODEL_DIR:-./${WORK_DIR}/final_model}"
 
 # Fuzzy neighborhood directory
-FUZZY_DIR="${FUZZY_DIR:-./${WORK_DIR}/fuzzy_neighborhood}"
+FUZZY_DIR="${FUZZY_DIR:-${MODEL_DIR}/fuzzy_neighborhood}"
 
 # Walks CSV file
 WALKS_CSV="${WALKS_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME}.csv}"
@@ -46,7 +47,7 @@ UMAP_RANDOM_STATE="${UMAP_RANDOM_STATE:-100}"  # Set to integer for reproducibil
 MAX_LENGTH="${MAX_LENGTH:-128}"  # Maximum number of points to plot in trajectory
 
 # Output directory
-OUTPUT_DIR="${OUTPUT_DIR:-./${WORK_DIR}/umap_plot}"
+OUTPUT_DIR="${OUTPUT_DIR:-${MODEL_DIR}/umap_plot}"
 
 echo ""
 echo "Configuration:"

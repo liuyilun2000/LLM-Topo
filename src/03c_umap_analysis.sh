@@ -3,11 +3,10 @@
 # Apply UMAP and generate dimensionality reduction results
 #
 # This script applies UMAP (Uniform Manifold Approximation and Projection) to
-# reduce the dimensionality of the token representations. It supports multiple
+# reduce the dimensionality of the token representations. It supports two
 # input modes:
-#   - Fuzzy neighborhood distance matrices (USE_FUZZY=true)
-#   - Downsampled PCA data (USE_DOWNSAMPLED=true)
-#   - Regular PCA data (default)
+#   - Fuzzy neighborhood distance matrices (USE_FUZZY=true) [default]
+#   - Regular PCA data (USE_FUZZY=false)
 
 set -e
 
@@ -19,24 +18,8 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Local configuration
-
 # Determine which data to use
-USE_DOWNSAMPLED="${USE_DOWNSAMPLED:-false}"
 USE_FUZZY="${USE_FUZZY:-true}"
-
-if [ "$USE_FUZZY" = "true" ]; then
-    FUZZY_DIR="${FUZZY_DIR:-./${WORK_DIR}/fuzzy_neighborhood}"
-    echo "Input mode: Fuzzy neighborhood distance matrices"
-elif [ "$USE_DOWNSAMPLED" = "true" ]; then
-    PCA_DIR="${PCA_DIR:-./${WORK_DIR}/density_downsampling}"
-    echo "Input mode: Downsampled PCA data"
-else
-    PCA_DIR="${PCA_DIR:-./${WORK_DIR}/pca_result}"
-    echo "Input mode: Regular PCA data"
-fi
-
-REPRESENTATION_DIR="${REPRESENTATION_DIR:-./${WORK_DIR}/token_representations}"
 
 # UMAP parameters
 UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-6}"
@@ -50,13 +33,15 @@ SAVE_UMAP_RESULT="${SAVE_UMAP_RESULT:-true}"
 GENERATE_VISUALIZATIONS="${GENERATE_VISUALIZATIONS:-false}"
 
 # Output directory (includes dimensionality)
-OUTPUT_DIR="${OUTPUT_DIR:-./${WORK_DIR}/umap_result_${UMAP_N_COMPONENTS}d}"
+OUTPUT_DIR="${OUTPUT_DIR:-${MODEL_DIR}/umap_result_${UMAP_N_COMPONENTS}d}"
 
 echo ""
 echo "Configuration:"
 if [ "$USE_FUZZY" = "true" ]; then
-    echo "  Fuzzy dir: $FUZZY_DIR"
+    echo "  Input mode: Fuzzy neighborhood distance matrices"
+    echo "  Fuzzy dir: $FUZZY_NEIGHBORHOOD_DIR"
 else
+    echo "  Input mode: Regular PCA data"
     echo "  PCA dir: $PCA_DIR"
 fi
 echo "  Representation dir: $REPRESENTATION_DIR"
@@ -80,42 +65,27 @@ echo ""
 
 # Check if results exist
 if [ "$USE_FUZZY" = "true" ]; then
-    if [ ! -d "$FUZZY_DIR" ] || [ -z "$(ls -A $FUZZY_DIR/*_fuzzy_dist.npz 2>/dev/null)" ]; then
-        echo "Error: Fuzzy neighborhood distance matrices not found in $FUZZY_DIR"
+    if [ ! -d "$FUZZY_NEIGHBORHOOD_DIR" ] || [ -z "$(ls -A $FUZZY_NEIGHBORHOOD_DIR/*_fuzzy_dist.npz 2>/dev/null)" ]; then
+        echo "Error: Fuzzy neighborhood distance matrices not found in $FUZZY_NEIGHBORHOOD_DIR"
         echo "Please run ./03b_fuzzy_neighborhood.sh first"
         exit 1
     fi
-    USE_FUZZY_FLAG="--use_fuzzy"
-    USE_DOWNSAMPLED_FLAG=""
-    FUZZY_DIR_ARG="--fuzzy_dir"
-elif [ "$USE_DOWNSAMPLED" = "true" ]; then
-    if [ ! -d "$PCA_DIR" ] || [ -z "$(ls -A $PCA_DIR/*_pca_downsampled.npz 2>/dev/null)" ]; then
-        echo "Error: Downsampled PCA results not found in $PCA_DIR"
-        echo "Please run density downsampling step first"
-        exit 1
-    fi
-    USE_FUZZY_FLAG=""
-    USE_DOWNSAMPLED_FLAG="--use_downsampled"
-    FUZZY_DIR_ARG=""
 else
     if [ ! -d "$PCA_DIR" ] || [ -z "$(ls -A $PCA_DIR/*_pca.npz 2>/dev/null)" ]; then
         echo "Error: PCA results not found in $PCA_DIR"
         echo "Please run ./03a_pca_analysis.sh first"
         exit 1
     fi
-    USE_FUZZY_FLAG=""
-    USE_DOWNSAMPLED_FLAG=""
-    FUZZY_DIR_ARG=""
 fi
 
 echo "Applying UMAP..."
 
 if [ "$USE_FUZZY" = "true" ]; then
     python scripts/03c_umap_analysis.py \
-        --fuzzy_dir "$FUZZY_DIR" \
+        --fuzzy_dir "$FUZZY_NEIGHBORHOOD_DIR" \
         --representation_dir "$REPRESENTATION_DIR" \
         --output_dir "$OUTPUT_DIR" \
-        $USE_FUZZY_FLAG \
+        --use_fuzzy \
         --umap_n_components "$UMAP_N_COMPONENTS" \
         --umap_min_dist "$UMAP_MIN_DIST" \
         --umap_n_neighbors "$UMAP_N_NEIGHBORS" \
@@ -127,7 +97,6 @@ else
         --pca_dir "$PCA_DIR" \
         --representation_dir "$REPRESENTATION_DIR" \
         --output_dir "$OUTPUT_DIR" \
-        $USE_DOWNSAMPLED_FLAG \
         --umap_n_components "$UMAP_N_COMPONENTS" \
         --umap_min_dist "$UMAP_MIN_DIST" \
         --umap_n_neighbors "$UMAP_N_NEIGHBORS" \

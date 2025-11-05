@@ -23,14 +23,10 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Local configuration
-MODEL_DIR="${MODEL_DIR:-./${WORK_DIR}/final_model}"
-REPRESENTATION_DIR="${REPRESENTATION_DIR:-./${WORK_DIR}/token_representations}"
-
 # Representation types to extract (default: after_block)
 # Options: residual_before, after_attention, after_block, ffn_gate, ffn_up
 # Multiple can be specified: REPRESENTATIONS="after_block ffn_gate ffn_up"
-REPRESENTATIONS="${REPRESENTATIONS:-after_block}"
+REPRESENTATIONS="${REPRESENTATIONS:-after_block ffn_gate ffn_up}"
 
 echo ""
 echo "Configuration:"

@@ -17,7 +17,6 @@ source "${SCRIPT_DIR}/00_config_env.sh"
 
 # Local configuration
 INPUT_CSV=${INPUT_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME}.csv}
-DATASET_DIR=${DATASET_DIR:-./${DATA_DIR}/dataset}
 TRAIN_SPLIT=${TRAIN_SPLIT:-0.95}
 
 echo ""

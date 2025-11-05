@@ -16,8 +16,6 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
 # Local configuration
-GRAPH_DIR="${GRAPH_DIR:-./${DATA_DIR}/graph}"
-NEIGH=${NEIGH:-8}
 MAX_LENGTH=${MAX_LENGTH:-128}
 MAX_SEQS=${MAX_SEQS:-120000}
 MIN_VISITS_PER_NODE=${MIN_VISITS_PER_NODE:-10000000000}
