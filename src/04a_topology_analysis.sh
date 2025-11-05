@@ -53,7 +53,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-./${WORK_DIR}/topology_analysis}"
 # Ripser parameters for persistence diagram generation
 RIPSER_THRESH="${RIPSER_THRESH:-}"
 RIPSER_MAXDIM="${RIPSER_MAXDIM:-2}"
-RIPSER_COEFF="${RIPSER_COEFF:-47}"
+RIPSER_COEFF="${RIPSER_COEFF:-3}"
 
 echo ""
 echo "Configuration:"

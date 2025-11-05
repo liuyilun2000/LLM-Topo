@@ -29,7 +29,20 @@ export RUN_NAME=2M_llama # Model run identifier
 
 ### 2. Run Complete Pipeline
 
-All scripts should be run from the `src/` directory:
+**Option A: Run Full Pipeline (Recommended)**
+
+Run all stages automatically with default settings:
+
+```bash
+cd src/
+./00_run_full_pipeline.sh
+```
+
+This will execute all stages from 01a to 04b sequentially with default settings.
+
+**Option B: Run Individual Stages**
+
+Run stages individually for more control:
 
 ```bash
 cd src/
@@ -102,6 +115,7 @@ export H=60 W=90 TOPOLOGY="torus" RUN_NAME="experiment_1"
 LLM-Topo/
 ├── src/
 │   ├── 00_config_env.sh              # Centralized configuration
+│   ├── 00_run_full_pipeline.sh      # Master script: Run all stages
 │   ├── 01a_graph_generation.sh        # Stage 01: Graph generation
 │   ├── 01b_sequence_generation.sh     # Stage 01: Random walk generation
 │   ├── 01c_dataset_preparation.sh    # Stage 01: Dataset preparation

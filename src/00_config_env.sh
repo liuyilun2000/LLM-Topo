@@ -13,25 +13,25 @@
 # ============================================================================
 
 # Grid dimensions
-export H=${H:-30}
-export W=${W:-40}
+export H=${H:-25}
+export W=${W:-25}
 
 # Topology configuration
 # Available topology types:
-#   - plane          : Plane (flat, no wrapping)
-#   - cylinder_x     : Cylinder wrapping in x-direction
-#   - cylinder_y     : Cylinder wrapping in y-direction
-#   - mobius_x       : Möbius strip wrapping in x-direction
-#   - mobius_y       : Möbius strip wrapping in y-direction
-#   - torus          : Torus (both directions wrap)
-#   - klein_x        : Klein bottle wrapping in x-direction
-#   - klein_y        : Klein bottle wrapping in y-direction
-#   - proj_plane     : Projective plane
-#   - sphere_two     : Sphere with two hemispheres (A and B layers, reverse boundary gluing)
-#   - hemisphere_n   : Northern hemisphere (open boundary)
-#   - hemisphere_s   : Southern hemisphere (open boundary)
-#   - sphere         : Sphere (single point S, all boundaries connect to S)
-export TOPOLOGY=${TOPOLOGY:-"klein_y"}
+#   - plane          : Plane (flat, no wrapping) (H=height/Y, W=width/X)
+#   - cylinder_x     : Cylinder wrapping in x-direction (H=height/Z-axis, W=circumference/angle)
+#   - cylinder_y     : Cylinder wrapping in y-direction (H=circumference/angle, W=height/Z-axis)
+#   - mobius_x       : Möbius strip wrapping in x-direction (H=width/across-strip, W=circumference/main-loop)
+#   - mobius_y       : Möbius strip wrapping in y-direction (H=circumference/main-loop, W=width/across-strip)
+#   - torus          : Torus (both directions wrap) (H=poloidal/tube-circumference, W=toroidal/major-radius)
+#   - klein_x        : Klein bottle wrapping in x-direction (H=U-direction, W=V-direction) (H=toroidal/major-loop, W=poloidal/tube-with-twist)
+#   - klein_y        : Klein bottle wrapping in y-direction (H=V-direction, W=U-direction) (H=poloidal/tube-with-twist, W=toroidal/major-loop)
+#   - proj_plane     : Projective plane (H=U-parameter, W=V-parameter)
+#   - sphere_two     : Sphere with two hemispheres (A and B layers, reverse boundary gluing) (H=square-grid-Y, W=square-grid-X)
+#   - hemisphere_n   : Northern hemisphere (open boundary) (H=latitude/radial-to-pole, W=longitude/azimuthal)
+#   - hemisphere_s   : Southern hemisphere (open boundary) (H=latitude/radial-to-pole, W=longitude/azimuthal)
+#   - sphere         : Sphere (single point S, all boundaries connect to S) (H≈latitude, W≈longitude, interior points only)
+export TOPOLOGY=${TOPOLOGY:-"sphere_two"}
 
 # Derived configuration - always recomputed from H, W, TOPOLOGY
 # DATASET_NAME is automatically generated from topology and dimensions

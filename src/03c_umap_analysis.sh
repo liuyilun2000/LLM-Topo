@@ -39,14 +39,15 @@ fi
 REPRESENTATION_DIR="${REPRESENTATION_DIR:-./${WORK_DIR}/token_representations}"
 
 # UMAP parameters
-UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-3}"
+UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-6}"
 UMAP_MIN_DIST="${UMAP_MIN_DIST:-0.2}"
 UMAP_N_NEIGHBORS="${UMAP_N_NEIGHBORS:-20}"
 UMAP_METRIC="${UMAP_METRIC:-cosine}"
+UMAP_RANDOM_STATE="${UMAP_RANDOM_STATE:-42}"  # Set to integer for reproducibility, empty for random
 
 # Output control flags
 SAVE_UMAP_RESULT="${SAVE_UMAP_RESULT:-true}"
-GENERATE_VISUALIZATIONS="${GENERATE_VISUALIZATIONS:-true}"
+GENERATE_VISUALIZATIONS="${GENERATE_VISUALIZATIONS:-false}"
 
 # Output directory (includes dimensionality)
 OUTPUT_DIR="${OUTPUT_DIR:-./${WORK_DIR}/umap_result_${UMAP_N_COMPONENTS}d}"
@@ -67,6 +68,11 @@ if [ "$USE_FUZZY" = "true" ]; then
     echo "  UMAP metric: precomputed (using fuzzy neighborhood distance matrix)"
 else
     echo "  UMAP metric: $UMAP_METRIC"
+fi
+if [ -n "$UMAP_RANDOM_STATE" ]; then
+    echo "  UMAP random_state: $UMAP_RANDOM_STATE"
+else
+    echo "  UMAP random_state: (random)"
 fi
 echo "  Save UMAP result: $SAVE_UMAP_RESULT"
 echo "  Generate visualizations: $GENERATE_VISUALIZATIONS"
@@ -113,6 +119,7 @@ if [ "$USE_FUZZY" = "true" ]; then
         --umap_n_components "$UMAP_N_COMPONENTS" \
         --umap_min_dist "$UMAP_MIN_DIST" \
         --umap_n_neighbors "$UMAP_N_NEIGHBORS" \
+        $(if [ -n "$UMAP_RANDOM_STATE" ]; then echo "--umap_random_state $UMAP_RANDOM_STATE"; fi) \
         $(if [ "$SAVE_UMAP_RESULT" = "true" ]; then echo "--save_umap_result"; fi) \
         $(if [ "$GENERATE_VISUALIZATIONS" = "true" ]; then echo "--generate_visualizations"; fi)
 else
@@ -125,6 +132,7 @@ else
         --umap_min_dist "$UMAP_MIN_DIST" \
         --umap_n_neighbors "$UMAP_N_NEIGHBORS" \
         --umap_metric "$UMAP_METRIC" \
+        $(if [ -n "$UMAP_RANDOM_STATE" ]; then echo "--umap_random_state $UMAP_RANDOM_STATE"; fi) \
         $(if [ "$SAVE_UMAP_RESULT" = "true" ]; then echo "--save_umap_result"; fi) \
         $(if [ "$GENERATE_VISUALIZATIONS" = "true" ]; then echo "--generate_visualizations"; fi)
 fi

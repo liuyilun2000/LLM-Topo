@@ -69,7 +69,7 @@ def load_fuzzy_distance_matrix(fuzzy_dir, key):
 
 
 def umap_analysis(data, n_components=2, min_dist=0.1, n_neighbors=15, metric='cosine', 
-                  distance_matrix=None, **kwargs):
+                  distance_matrix=None, random_state=None, **kwargs):
     """
     Perform UMAP dimensionality reduction
     
@@ -80,6 +80,7 @@ def umap_analysis(data, n_components=2, min_dist=0.1, n_neighbors=15, metric='co
         n_neighbors: number of neighbors (lower=more local, higher=more global)
         metric: distance metric to use (default: 'cosine', also supports 'euclidean', 'manhattan', 'precomputed')
         distance_matrix: precomputed distance matrix of shape [n_samples, n_samples] (when metric='precomputed')
+        random_state: random seed for reproducibility (default: None)
         **kwargs: additional UMAP parameters
     
     Returns:
@@ -113,6 +114,10 @@ def umap_analysis(data, n_components=2, min_dist=0.1, n_neighbors=15, metric='co
     print(f"  min_dist: {min_dist} (lower=more local, higher=more global)")
     print(f"  n_neighbors: {n_neighbors} (lower=more local, higher=more global)")
     print(f"  metric: {metric}")
+    if random_state is not None:
+        print(f"  random_state: {random_state}")
+    else:
+        print(f"  random_state: (random)")
     print(f"  init: spectral (default)")
     
     umap_reducer = umap.UMAP(
@@ -120,6 +125,7 @@ def umap_analysis(data, n_components=2, min_dist=0.1, n_neighbors=15, metric='co
         min_dist=min_dist, 
         n_neighbors=n_neighbors,
         metric=metric,
+        random_state=random_state,
         **kwargs
     )
     reduced = umap_reducer.fit_transform(input_data)
@@ -131,7 +137,8 @@ def umap_analysis(data, n_components=2, min_dist=0.1, n_neighbors=15, metric='co
         'min_dist': min_dist,
         'n_neighbors': n_neighbors,
         'metric': metric,
-        'use_precomputed': use_precomputed
+        'use_precomputed': use_precomputed,
+        'random_state': random_state
     }
     
     return reduced, info, umap_reducer
@@ -349,6 +356,8 @@ def main():
                       help='UMAP n_neighbors parameter (lower=more local, higher=more global)')
     parser.add_argument('--umap_metric', type=str, default='cosine',
                       help='UMAP distance metric (default: cosine, also supports euclidean, manhattan, etc.)')
+    parser.add_argument('--umap_random_state', type=int, default=None,
+                      help='Random seed for UMAP (default: None, for reproducibility set to integer)')
     parser.add_argument('--save_umap_result', action='store_true',
                       help='Save UMAP embeddings as .npz files (default: False)')
     parser.add_argument('--generate_visualizations', action='store_true',
@@ -444,6 +453,10 @@ def main():
         print(f"UMAP metric: precomputed (from fuzzy neighborhood)")
     else:
         print(f"UMAP metric: {args.umap_metric}")
+    if args.umap_random_state is not None:
+        print(f"UMAP random_state: {args.umap_random_state}")
+    else:
+        print(f"UMAP random_state: (random)")
     print(f"Save UMAP result: {args.save_umap_result}")
     print(f"Generate visualizations: {args.generate_visualizations}")
     if args.save_umap_result and args.umap_n_components > 3:
@@ -474,7 +487,8 @@ def main():
                     min_dist=args.umap_min_dist,
                     n_neighbors=args.umap_n_neighbors,
                     metric='precomputed',
-                    distance_matrix=distance_matrix
+                    distance_matrix=distance_matrix,
+                    random_state=args.umap_random_state
                 )
             else:
                 # Load PCA or downsampled PCA data
@@ -497,7 +511,8 @@ def main():
                     n_components=args.umap_n_components,
                     min_dist=args.umap_min_dist,
                     n_neighbors=args.umap_n_neighbors,
-                    metric=args.umap_metric
+                    metric=args.umap_metric,
+                    random_state=args.umap_random_state
                 )
             
             # Save UMAP result if requested
@@ -521,6 +536,7 @@ def main():
                     'n_neighbors': int(umap_info['n_neighbors']),
                     'metric': str(umap_info['metric']),
                     'use_precomputed': bool(umap_info['use_precomputed']),
+                    'random_state': umap_info.get('random_state', None),
                     'n_points': int(umap_data.shape[0]),
                     'n_dims': int(umap_data.shape[1])
                 }
