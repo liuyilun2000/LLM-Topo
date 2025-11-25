@@ -21,7 +21,7 @@ source "${SCRIPT_DIR}/00_config_env.sh"
 
 # Barcode parameters
 MAX_BARS="${MAX_BARS:-30}"
-TOP_K="${TOP_K:-4}"
+TOP_K="${TOP_K:-0}"
 
 echo ""
 echo "Configuration:"
