@@ -9,6 +9,7 @@ from pathlib import Path
 
 from datasets import load_from_disk
 from transformers import (
+    AutoTokenizer,
     LlamaConfig,
     LlamaForCausalLM,
     PreTrainedTokenizer,
@@ -262,10 +263,32 @@ def main():
     vocab_size = vocab_info['vocab_size']
     print(f"\nVocabulary size: {vocab_size}")
     
-    # Create tokenizer
-    print(f"\nCreating tokenizer...")
-    tokenizer = GraphWalkTokenizer(vocab_size)
-    print(f"  Tokenizer vocab size: {tokenizer.vocab_size}")
+    # Load or create tokenizer
+    print(f"\nLoading tokenizer...")
+    tokenizer_path = Path(args.dataset_dir)
+    
+    # Check if tokenizer was saved (from combined dataset preparation)
+    if (tokenizer_path / 'tokenizer_config.json').exists() or (tokenizer_path / 'vocab.json').exists():
+        print(f"  Found saved tokenizer in dataset directory, loading...")
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(str(tokenizer_path))
+            print(f"  ✓ Loaded tokenizer from dataset directory")
+            print(f"  Tokenizer vocab size: {len(tokenizer)}")
+            # Verify vocab size matches
+            if len(tokenizer) != vocab_size:
+                print(f"  ⚠ WARNING: Tokenizer vocab size ({len(tokenizer)}) != vocab_info vocab_size ({vocab_size})")
+                print(f"  Using tokenizer vocab size: {len(tokenizer)}")
+                vocab_size = len(tokenizer)
+        except Exception as e:
+            print(f"  ✗ Failed to load tokenizer: {e}")
+            print(f"  Falling back to GraphWalkTokenizer")
+            tokenizer = GraphWalkTokenizer(vocab_size)
+    else:
+        # Use custom GraphWalkTokenizer for pure synthetic datasets
+        print(f"  No saved tokenizer found, using GraphWalkTokenizer")
+        tokenizer = GraphWalkTokenizer(vocab_size)
+    
+    print(f"  Final tokenizer vocab size: {len(tokenizer)}")
     
     # Load model config
     print(f"\nLoading config from {args.config}")

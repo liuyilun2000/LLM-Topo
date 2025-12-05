@@ -48,6 +48,7 @@ export RUN_NAME=${RUN_NAME:-"2M_llama"}
 export WORK_DIR="results/${DATASET_NAME}/${RUN_NAME}"
 export DATA_DIR="results/${DATASET_NAME}"
 export DATASET_DIR="${DATASET_DIR:-${DATA_DIR}/dataset}"
+export COMBINED_DATASET_DIR="${COMBINED_DATASET_DIR:-${DATA_DIR}/combined_dataset}"
 
 # Graph generation parameters
 export GRAPH_DIR="${GRAPH_DIR:-./${DATA_DIR}/graph}"
