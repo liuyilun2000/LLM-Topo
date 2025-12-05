@@ -53,17 +53,18 @@ def load_target_dataset(dataset_name, dataset_config=None, split='train', stream
         return dataset, len(dataset)
 
 
-def extend_tokenizer_vocab(tokenizer, source_node_ids, source_token_prefix="<GRAPH_"):
+def extend_tokenizer_vocab(tokenizer, source_node_ids, source_token_prefix="<GRAPH_", source_token_start="<SOURCE_START>"):
     """
-    Extend tokenizer vocabulary with source tokens
+    Extend tokenizer vocabulary with source tokens and special start token
     
     Args:
         tokenizer: Base tokenizer to extend
         source_node_ids: List of node IDs to add as tokens
         source_token_prefix: Prefix for source tokens (e.g., "<GRAPH_0>", "<GRAPH_1>")
+        source_token_start: Special token to prepend before source tokens
     
     Returns:
-        Extended tokenizer, mapping from node_id to token_id
+        Extended tokenizer, mapping from node_id to token_id, source_start_token_id
     """
     print(f"\nExtending tokenizer vocabulary with {len(source_node_ids)} source tokens...")
     
@@ -80,8 +81,15 @@ def extend_tokenizer_vocab(tokenizer, source_node_ids, source_token_prefix="<GRA
         source_tokens.append(token_str)
         # We'll map after adding to tokenizer
     
-    # Add tokens to tokenizer
+    # Add source tokens to tokenizer (not as special tokens)
     tokenizer.add_tokens(source_tokens, special_tokens=False)
+    
+    # Add source start token separately as a special token if provided
+    source_start_token_id = None
+    if source_token_start:
+        tokenizer.add_tokens([source_token_start], special_tokens=True)
+        source_start_token_id = tokenizer.convert_tokens_to_ids(source_token_start)
+        print(f"Added source start token: {source_token_start} (ID: {source_start_token_id})")
     
     # Build mapping from node_id to token_id
     for node_id in source_node_ids:
@@ -92,18 +100,64 @@ def extend_tokenizer_vocab(tokenizer, source_node_ids, source_token_prefix="<GRA
     new_vocab_size = len(tokenizer)
     print(f"New vocab size: {new_vocab_size} (+{new_vocab_size - original_vocab_size})")
     
-    return tokenizer, node_to_token_id
+    return tokenizer, node_to_token_id, source_start_token_id
 
 
-def insert_source_tokens(target_token_ids, source_token_ids, min_source_count, max_insertions_per_seq=None, rng=None):
+def sample_source_token_count(min_count, max_count, power_law_alpha=2.0, rng=None):
     """
-    Insert source tokens into a target sequence
+    Sample number of source tokens to insert using a truncated power law distribution.
+    
+    This simulates natural language patterns where most sequences have few source tokens
+    (like occasional mentions of days/months) and few sequences have many source tokens.
+    
+    Args:
+        min_count: Minimum number of source tokens
+        max_count: Maximum number of source tokens (or None for no limit)
+        power_law_alpha: Power law exponent (higher = more long-tailed, default 2.0)
+        rng: Random number generator
+    
+    Returns:
+        Number of source tokens to insert (integer)
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    
+    if max_count is None or max_count <= min_count:
+        return min_count
+    
+    # Use power law distribution: P(k) ∝ k^(-alpha)
+    # Sample from continuous power law, then round to integer
+    # For power law: x = (1 - u)^(-1/(alpha-1)) where u ~ Uniform(0,1)
+    # We need to normalize to [min_count, max_count]
+    
+    # Normalize to [0, 1] range
+    u = rng.random()
+    
+    # Power law sampling: transform uniform to power law
+    # For truncated power law on [a, b]: 
+    # x = [a^(1-alpha) + u * (b^(1-alpha) - a^(1-alpha))]^(1/(1-alpha))
+    if power_law_alpha == 1.0:
+        # Special case: uniform distribution
+        count = int(rng.integers(min_count, max_count + 1))
+    else:
+        a = float(min_count)
+        b = float(max_count)
+        # Power law transformation
+        x = (a**(1 - power_law_alpha) + u * (b**(1 - power_law_alpha) - a**(1 - power_law_alpha)))**(1 / (1 - power_law_alpha))
+        count = int(np.clip(np.round(x), min_count, max_count))
+    
+    return count
+
+
+def insert_source_tokens(target_token_ids, source_token_ids, num_insertions, source_start_token_id=None, rng=None):
+    """
+    Insert source tokens into a target sequence, with optional special start token
     
     Args:
         target_token_ids: List of token IDs from target text
         source_token_ids: List of source token IDs to choose from
-        min_source_count: Minimum number of source tokens to insert
-        max_insertions_per_seq: Maximum source tokens per sequence (None = no limit)
+        num_insertions: Number of source tokens to insert
+        source_start_token_id: Optional special token ID to prepend before each source token
         rng: Random number generator
     
     Returns:
@@ -112,11 +166,6 @@ def insert_source_tokens(target_token_ids, source_token_ids, min_source_count, m
     if rng is None:
         rng = random
     
-    # Determine how many source tokens to insert
-    num_insertions = min_source_count
-    if max_insertions_per_seq is not None:
-        num_insertions = min(num_insertions, max_insertions_per_seq)
-    
     # If we need more than available, use all available
     num_insertions = min(num_insertions, len(source_token_ids))
     
@@ -124,13 +173,23 @@ def insert_source_tokens(target_token_ids, source_token_ids, min_source_count, m
         return target_token_ids
     
     # Sample source tokens to insert
-    tokens_to_insert = rng.choices(source_token_ids, k=num_insertions)
+    if isinstance(rng, np.random.Generator):
+        tokens_to_insert = rng.choice(source_token_ids, size=num_insertions, replace=True).tolist()
+    else:
+        tokens_to_insert = rng.choices(source_token_ids, k=num_insertions)
     
     # Insert at random positions
     combined = target_token_ids.copy()
     for token in tokens_to_insert:
         # Insert at random position (including at the end)
-        insert_pos = rng.randint(0, len(combined))
+        if isinstance(rng, np.random.Generator):
+            insert_pos = rng.integers(0, len(combined) + 1)
+        else:
+            insert_pos = rng.randint(0, len(combined) + 1)
+        # Insert source start token before source token if provided
+        if source_start_token_id is not None:
+            combined.insert(insert_pos, source_start_token_id)
+            insert_pos += 1
         combined.insert(insert_pos, token)
     
     return combined
@@ -145,6 +204,8 @@ def prepare_combined_dataset(
     max_source_per_seq=None,
     source_ratio=0.5,
     max_length=None,
+    source_start_token_id=None,
+    power_law_alpha=2.0,
     seed=42
 ):
     """
@@ -156,9 +217,11 @@ def prepare_combined_dataset(
         tokenizer: Extended tokenizer
         node_to_token_id: Mapping from node_id to token_id
         min_source_per_seq: Minimum source tokens per target sequence
-        max_source_per_seq: Maximum source tokens per target sequence
+        max_source_per_seq: Maximum source tokens per target sequence (None = no limit)
         source_ratio: Ratio of pure source sequences in final dataset
         max_length: Maximum sequence length (truncate if needed)
+        source_start_token_id: Special token ID to prepend before source tokens
+        power_law_alpha: Power law exponent for source token distribution (higher = more long-tailed)
         seed: Random seed
     
     Returns:
@@ -168,6 +231,7 @@ def prepare_combined_dataset(
     random.seed(seed)
     
     print(f"\nPreparing combined dataset...")
+    print(f"  Source token distribution: Power law (alpha={power_law_alpha})")
     print(f"  Min source tokens per target seq: {min_source_per_seq}")
     print(f"  Max source tokens per target seq: {max_source_per_seq or 'unlimited'}")
     print(f"  Source sequence ratio: {source_ratio}")
@@ -175,6 +239,9 @@ def prepare_combined_dataset(
     
     # Get all source token IDs
     source_token_ids = list(node_to_token_id.values())
+    
+    # Track distribution for reporting
+    insertion_counts = []
     
     # Process target sequences
     print(f"\nProcessing {len(target_dataset)} target sequences...")
@@ -203,12 +270,21 @@ def prepare_combined_dataset(
             tokenized = tokenizer(text, add_special_tokens=False, return_attention_mask=False)
             target_token_ids = tokenized['input_ids']
         
+        # Sample number of source tokens to insert from power law distribution
+        num_insertions = sample_source_token_count(
+            min_source_per_seq,
+            max_source_per_seq,
+            power_law_alpha,
+            rng
+        )
+        insertion_counts.append(num_insertions)
+        
         # Insert source tokens
         combined_ids = insert_source_tokens(
             target_token_ids,
             source_token_ids,
-            min_source_per_seq,
-            max_source_per_seq,
+            num_insertions,
+            source_start_token_id,
             rng
         )
         
@@ -221,6 +297,22 @@ def prepare_combined_dataset(
             'length': len(combined_ids)
         })
     
+    # Report distribution statistics
+    if insertion_counts:
+        insertion_counts = np.array(insertion_counts)
+        print(f"\nSource token insertion statistics:")
+        print(f"  Mean: {insertion_counts.mean():.2f}")
+        print(f"  Median: {np.median(insertion_counts):.2f}")
+        print(f"  Std: {insertion_counts.std():.2f}")
+        print(f"  Min: {insertion_counts.min()}")
+        print(f"  Max: {insertion_counts.max()}")
+        # Show distribution percentiles
+        percentiles = [10, 25, 50, 75, 90, 95, 99]
+        print(f"  Percentiles:")
+        for p in percentiles:
+            val = np.percentile(insertion_counts, p)
+            print(f"    {p}th: {val:.1f}")
+    
     # Process source sequences
     print(f"\nProcessing {len(source_df)} source sequences...")
     source_sequences = []
@@ -230,6 +322,10 @@ def prepare_combined_dataset(
         sequence = str(row['sequence_labels'])
         node_ids = [int(x) for x in sequence.split()]
         token_ids = [node_to_token_id[node_id] for node_id in node_ids]
+        
+        # Prepend source start token at the beginning of the sequence if provided
+        if source_start_token_id is not None:
+            token_ids = [source_start_token_id] + token_ids
         
         # Truncate if needed
         if max_length and len(token_ids) > max_length:
@@ -328,16 +424,20 @@ def main():
                       help='Output directory for combined dataset')
     
     # Configuration
-    parser.add_argument('--min_source_per_seq', type=int, default=5,
+    parser.add_argument('--min_source_per_seq', type=int, default=1,
                       help='Minimum source tokens per target sequence')
     parser.add_argument('--max_source_per_seq', type=int, default=None,
-                      help='Maximum source tokens per target sequence (None = unlimited)')
+                      help='Maximum source tokens per target sequence (None = unlimited, or set to max_length for full sequences)')
     parser.add_argument('--source_ratio', type=float, default=0.5,
                       help='Ratio of pure source sequences in final dataset')
     parser.add_argument('--max_length', type=int, default=None,
                       help='Maximum sequence length (truncate if longer)')
+    parser.add_argument('--power_law_alpha', type=float, default=2.0,
+                      help='Power law exponent for source token distribution (higher = more long-tailed, typical range: 1.5-3.0)')
     parser.add_argument('--source_token_prefix', type=str, default='<GRAPH_',
                       help='Prefix for source tokens (e.g., "<GRAPH_0>")')
+    parser.add_argument('--source_token_start', type=str, default='<SOURCE_START>',
+                      help='Special token to prepend before source tokens')
     parser.add_argument('--seed', type=int, default=42,
                       help='Random seed')
     
@@ -382,10 +482,11 @@ def main():
         tokenizer.pad_token = tokenizer.eos_token
     
     # Extend tokenizer with source tokens
-    tokenizer, node_to_token_id = extend_tokenizer_vocab(
+    tokenizer, node_to_token_id, source_start_token_id = extend_tokenizer_vocab(
         tokenizer,
         source_node_ids,
-        args.source_token_prefix
+        args.source_token_prefix,
+        args.source_token_start
     )
     
     # Prepare combined dataset
@@ -398,6 +499,8 @@ def main():
         args.max_source_per_seq,
         args.source_ratio,
         args.max_length,
+        source_start_token_id,
+        args.power_law_alpha,
         args.seed
     )
     

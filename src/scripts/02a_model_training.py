@@ -217,15 +217,19 @@ def main():
             # sm_100, sm_101, sm_102, sm_103, sm_110, sm_120+ require newer builds
             if props.major >= 10:
                 print(f"\n  ⚠ WARNING: GPU has compute capability sm_{props.major}{props.minor}")
-                print(f"  This GPU architecture may not be supported by your PyTorch build.")
+                print(f"  This GPU architecture may not be fully optimized by your PyTorch build.")
                 print(f"  Current PyTorch version: {torch.__version__}")
                 
                 if props.major >= 12:
-                    print(f"\n  ✗ ERROR: Blackwell architecture (sm_{props.major}{props.minor}) is not supported yet.")
+                    print(f"\n  ✗ ERROR: Blackwell architecture (sm_{props.major}{props.minor}) is not supported by current PyTorch.")
+                    print(f"  PyTorch {torch.__version__} does not have CUDA kernels for sm_120.")
+                    print(f"  This will cause 'no kernel image available' errors during training.")
                     print(f"\n  Solutions:")
                     print(f"  1. Use CPU training: USE_CPU=true ./02a_model_training.sh")
-                    print(f"  2. Wait for official PyTorch support (check https://pytorch.org/get-started/locally/)")
-                    print(f"\n  Falling back to CPU training...")
+                    print(f"  2. Try PyTorch nightly (may have experimental support):")
+                    print(f"     pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu124")
+                    print(f"  3. Wait for official PyTorch support")
+                    print(f"\n  Automatically falling back to CPU training...")
                     args.no_cuda = True
                     actual_device = "CPU"
                 elif props.major == 10:

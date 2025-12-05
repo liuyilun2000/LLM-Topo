@@ -13,8 +13,8 @@
 # ============================================================================
 
 # Grid dimensions
-export H=${H:-25}
-export W=${W:-25}
+export H=${H:-30}
+export W=${W:-40}
 
 # Topology configuration
 # Available topology types:
@@ -31,7 +31,7 @@ export W=${W:-25}
 #   - hemisphere_n   : Northern hemisphere (open boundary) (H=latitude/radial-to-pole, W=longitude/azimuthal)
 #   - hemisphere_s   : Southern hemisphere (open boundary) (H=latitude/radial-to-pole, W=longitude/azimuthal)
 #   - sphere         : Sphere (single point S, all boundaries connect to S) (H≈latitude, W≈longitude, interior points only)
-export TOPOLOGY=${TOPOLOGY:-"sphere_two"}
+export TOPOLOGY=${TOPOLOGY:-"torus"}
 
 # Derived configuration - always recomputed from H, W, TOPOLOGY
 # DATASET_NAME is automatically generated from topology and dimensions

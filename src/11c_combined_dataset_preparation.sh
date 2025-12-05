@@ -3,8 +3,9 @@
 # Prepare combined dataset from target natural language dataset and source graph walks
 #
 # This script combines a target dataset (e.g., TinyStories) with source graph walk
-# sequences. It extends the tokenizer vocabulary with source tokens and ensures
-# each target sequence contains a minimum number of source tokens for learning.
+# sequences. It extends the tokenizer vocabulary with source tokens and inserts
+# source tokens into target sequences following a power law distribution to simulate
+# natural language patterns (e.g., days of week, months appearing occasionally).
 
 set -e
 
@@ -32,11 +33,14 @@ SOURCE_CSV=${SOURCE_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME}.csv}
 COMBINED_DATASET_DIR=${COMBINED_DATASET_DIR:-./${DATA_DIR}/combined_dataset}
 
 # Insertion parameters
-MIN_SOURCE_PER_SEQ=${MIN_SOURCE_PER_SEQ:-5}
+# Power law distribution: most sequences have few source tokens, few have many
+MIN_SOURCE_PER_SEQ=${MIN_SOURCE_PER_SEQ:-2}
 MAX_SOURCE_PER_SEQ=${MAX_SOURCE_PER_SEQ:-""}
-SOURCE_RATIO=${SOURCE_RATIO:-0.5}
+POWER_LAW_ALPHA=${POWER_LAW_ALPHA:-2.0}
+SOURCE_RATIO=${SOURCE_RATIO:-0}
 MAX_LENGTH=${MAX_LENGTH:-512}
 SOURCE_TOKEN_PREFIX=${SOURCE_TOKEN_PREFIX:-"<GRAPH_"}
+SOURCE_TOKEN_START=${SOURCE_TOKEN_START:-"<SOURCE_START>"}
 SEED=${SEED:-42}
 
 echo ""
@@ -53,13 +57,17 @@ echo "  Source CSV: ${SOURCE_CSV}"
 echo "  Output dir: ${COMBINED_DATASET_DIR}"
 echo ""
 echo "Insertion parameters:"
+echo "  Distribution: Power law (alpha=${POWER_LAW_ALPHA})"
 echo "  Min source tokens per seq: ${MIN_SOURCE_PER_SEQ}"
 if [ -n "${MAX_SOURCE_PER_SEQ}" ]; then
     echo "  Max source tokens per seq: ${MAX_SOURCE_PER_SEQ}"
+else
+    echo "  Max source tokens per seq: unlimited"
 fi
 echo "  Source sequence ratio: ${SOURCE_RATIO}"
 echo "  Max sequence length: ${MAX_LENGTH}"
 echo "  Source token prefix: ${SOURCE_TOKEN_PREFIX}"
+echo "  Source token start: ${SOURCE_TOKEN_START}"
 echo "  Seed: ${SEED}"
 echo ""
 
@@ -78,9 +86,11 @@ CMD="python scripts/11c_combined_dataset_preparation.py \
     --source_csv \"${SOURCE_CSV}\" \
     --output_dir \"${COMBINED_DATASET_DIR}\" \
     --min_source_per_seq ${MIN_SOURCE_PER_SEQ} \
+    --power_law_alpha ${POWER_LAW_ALPHA} \
     --source_ratio ${SOURCE_RATIO} \
     --max_length ${MAX_LENGTH} \
     --source_token_prefix \"${SOURCE_TOKEN_PREFIX}\" \
+    --source_token_start \"${SOURCE_TOKEN_START}\" \
     --seed ${SEED}"
 
 # Add optional arguments
