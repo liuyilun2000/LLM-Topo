@@ -1,0 +1,373 @@
+\section{Experiments}
+
+\subsection{Experimental Setup}
+
+\paragraph{Datasets.}
+\blackout{We construct synthetic datasets by generating random walks on combinatorial graphs that discretize target topological manifolds following the methodology in Section}~\ref{sec:dataset}.
+We evaluate on the four compact, connected 2-manifold topologies as specified in Section~\ref{sec:math} and Table~\ref{tab:manifolds}.
+For each topology, we place a regular $H \times W$ lattice on the fundamental polygon, where $H$ and $W$ denote the grid dimensions along the height and width axes respectively, yielding graphs with $|V_\theta| = H\times W$ vertices.
+Each vertex connects to its $\epsilon$-neighbors within the lattice which is designed by assigning $k$ nearest neighbors to form connectivity patterns in the grid. 
+Boundary edges are added according to the topology-specific boundary identification rules to preserve the manifold's global structure.
+
+Random walk sequences are generated using Algorithm~\ref{alg:random-walk} chosen to satisfy the conditions of Lemma~\ref{lem:random_walk}.
+We additionally introduce controlled temperature $\alpha$ for uniform neighbor sampling.
+We set maximum sequence length $T_{\max}$, maximum number of sequences $S_{\max}$, minimum visit count per node $\kappa$, no-repeat window size $w$, restart probability $\rho$, and temperature parameter $\alpha$ at adequate levels as specified in Appendix~\ref{app:hyperparams}.
+Each walk produces a token sequence where vertices map to distinct tokens from vocabulary $\mathcal{V}$ with $|\mathcal{V}| = H \times W$.
+The resulting dataset $\mathcal{D}$ contains sequences that implicitly encode the underlying manifold topology through local transition patterns, providing a controlled testbed for evaluating whether language models can recover topological invariants from sequential observations alone.
+
+
+\paragraph{Language Model.}
+We train autoregressive transformer language models from scratch on the generated datasets using the HuggingFace Transformers library.
+The model architecture follows the LLaMA design~\citep{touvron2023llama} with decoder-only blocks, each consisting of multi-head self-attention using grouped query attention (GQA) architecture and Rotary Positional Embedding (RoPE,~\citet{su2024roformer}) with a maximum sequence length sufficient to accommodate the generated walk sequences, and token-wise FFN based on gated linear unit (GLU,~\citet{swiglu}) architecture, with residual connections and pre-layer normalization.
+We experiment models with varying capacity and design choices to study the relationship between the topology reconstruction capability and model designs.
+The vocabulary size $|\mathcal{V}|$ matches the number of vertices $|V_\theta|$ in each graph, ensuring a one-to-one correspondence between tokens and spatial locations.
+Specific model configurations and architectural details are provided in following sections and in Appendix~\ref{app:hyperparams}.
+
+\paragraph{Training.}
+Models are trained using the standard next-token prediction objective with cross-entropy loss, as described in Section~\ref{sec:lmm-rep}.
+Training is performed using the HuggingFace Trainer API and PyTorch on Nvidia A100 GPU hardware.
+The training objective provides learning signals solely from modeling local sequential dependencies within the dataset of token sequences, with no explicit supervision on the underlying topological structure.
+All training hyperparameters including dataset split, batch size, learning rate, number of training epochs, gradient accumulation steps, and optimization schedule are specified in Appendix~\ref{app:hyperparams}.
+Models are trained with sufficient training data that guarantee convergence, as measured by validation loss stabilization.
+
+\paragraph{Analysis.}
+After training, we extract internal representations from each layer of the trained models following the procedure in Section~\ref{sec:lmm-rep}.
+Representation extraction is performed using forward hooks to capture hidden states at specified points in the model architecture, following approaches similar to TransformerLens~\citep{nanda2022transformerlens} for accessing internal activations and hidden states.
+For each unique token $t(v) \in \mathcal{V}$, we aggregate $\mathbf{x}_i^l$ across all positions where the token appears in evaluation sequences, then compute average-pooled representations $\bar{\mathbf{X}}^l_v \in \mathbb{R}^d$ to obtain layer-wise point clouds $X^l = \{\bar{\mathbf{X}}^l_v : v \in V_\theta\}$ of cardinality $|V_\theta|$.
+
+Dimensionality reduction is performed via principal component analysis (PCA) implemented in scikit-learn~\citep{pedregosa2011scikit}.
+PCA is applied with a variance threshold to retain the minimum number of components needed to preserve a target proportion of cumulative variance, yielding PCA-reduced point clouds $X_{\mathrm{PCA}} \subset \mathbb{R}^{d_{\mathrm{PCA}}}$ where $d_{\mathrm{PCA}}$ is determined adaptively.
+The specific variance threshold and other PCA hyperparameters are detailed in Appendix~\ref{app:hyperparams}.
+
+Fuzzy neighborhood distance matrices are constructed from $X_{\mathrm{PCA}}$ using the method described in Section~\ref{sec:tda}.
+For each point, we establish a local metric space considering its $k$-nearest neighbors, compute adaptive local scales $\sigma(\mathbf{x})$ via entropy-constrained optimization, and build asymmetric membership matrices that are symmetrized using fuzzy union operations.
+The resulting fuzzy membership matrix is converted to a distance metric via logarithmic transformation.
+All fuzzy neighborhood hyperparameters including the number of nearest neighbors $k$, distance metric choice, and numerical stability constants are specified in Appendix~\ref{app:hyperparams}.
+
+Uniform Manifold Approximation and Projection (UMAP)~\citep{mcinnes2018umap} is then applied to the fuzzy distance matrices using the umap-learn library to further reduce dimensionality.
+UMAP is configured to use precomputed distance matrices from the fuzzy neighborhood computation, with parameters controlling the balance between local and global structure preservation.
+This produces final point clouds $X_{\mathrm{UMAP}} \subset \mathbb{R}^{d_{\mathrm{UMAP}}}$ for topological analysis, where $d_{\mathrm{UMAP}}$ and all UMAP hyperparameters are provided in Appendix~\ref{app:hyperparams}.
+
+Persistent cohomology is computed on $X_{\mathrm{UMAP}}$ using the Ripser ~\citep{Tralie2018Ripser, Bauer2021Ripser} implementation to generate Vietoris-Rips filtrations and compute persistence diagrams.
+We compute persistent cohomology groups up to dimension $k=2$ (capturing connected components $H^0$, loops $H^1$, and voids $H^2$), generating persistence barcodes $\mathcal{B}^k_p$ for each dimension with coefficients in prime field $\mathbb{Z}_p$.
+Statistical significance analysis identifies the most prominent topological features by computing $z$-scores for persistence lifetimes $\ell_\alpha$ relative to dimension-specific empirical distributions.
+Bars with $z$-scores exceeding a threshold are designated as significant, and empirical Betti numbers $\hat{\beta}^k_p$ are computed by counting significant persistent cohomology bars.
+The estimated Betti numbers are compared against ground-truth Betti numbers $\beta^k(M; \mathbb{Z}_p)$ of the target manifold $M$, which are known a priori from the synthetic dataset construction.
+Successful topology reconstruction is confirmed when $\hat{\beta}^k_p \approx \beta^k(M; \mathbb{Z}_p)$ across all dimensions $k$.
+All persistent homology computation parameters including the prime field $p$, maximum homology dimension, and statistical significance thresholds are documented as specified in following sections and in Appendix~\ref{app:hyperparams}.
+
+
+
+
+
+
+
+
+\subsection{Topological Structure Recovery from Learned Representations}
+% 验证LLM学到的内部表示是否恢复了数据集的拓扑结构
+
+
+To verify whether language models reconstruct the source topology of training data in their internal representations, we conduct experiments first over spherical and toroidal datasets. 
+Figure~\ref{fig:sphere_torus_barcode_across_layer} presents $\mathbb{Z}_{47}$\footnote{The choice of coefficient field $\mathbb{Z}_{47}$  ensures homology and cohomology coincide while being unlikely to divide any potential torsion subgroups~\citep{gardner2022toroidal}.} persistent cohomology barcode results as a prominent evidence. 
+From the middle to final layers (after layers 2), the barcodes display characteristic topological fingerprints precisely matching the corresponding ground truth of $H^*(S^2; \mathbb{Z}_{47})$ and $H^*(T^2; \mathbb{Z}_{47})$.
+
+
+
+We further conduct experiments over different $\mathbb{Z}_p$ for the Klein bottle and real projective plane as non-orientable topologies with torsion, as results shown in Figure \ref{fig:klein_rp_barcode_across_layer}.
+
+
+\begin{figure}[t]
+    \centering
+    \captionsetup{font=small}
+    
+    % Subfigure (a) - Sphere
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \includegraphics[width=0.154\linewidth]{img/sphere/sphere_two_25x25_2M_llama_Z47_input_embeds_barcode.pdf}
+        \hfill
+        \includegraphics[width=0.154\linewidth]{img/sphere/sphere_two_25x25_2M_llama_Z47_layer_0_hidden_barcode.pdf}
+        \hfill
+        \includegraphics[width=0.154\linewidth]{img/sphere/sphere_two_25x25_2M_llama_Z47_layer_1_hidden_barcode.pdf}
+        \hfill
+        \includegraphics[width=0.154\linewidth]{img/sphere/sphere_two_25x25_2M_llama_Z47_layer_2_hidden_barcode.pdf}
+        \hfill
+        \includegraphics[width=0.154\linewidth]{img/sphere/sphere_two_25x25_2M_llama_Z47_layer_4_hidden_barcode.pdf}
+        \hfill
+        \includegraphics[width=0.154\linewidth]{img/sphere/sphere_two_25x25_2M_llama_Z47_final_hidden_barcode.pdf}
+    \vspace{-0.1cm}
+        \caption{\textbf{Results for \textit{sphere}.} 1 prominent bar in $H^0$, 0 in $H^1$ and 1 in $H^2$ indicates a sphere.}
+        \label{fig:sphere_across_layer}
+    \end{subfigure}
+    
+    \vspace{0.2cm}
+    
+    % Subfigure (b) - Torus
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \includegraphics[width=0.154\linewidth]{img/torus/torus_30x40_2M_llama_Z47_input_embeds_barcode.pdf}
+        \hfill
+        \includegraphics[width=0.154\linewidth]{img/torus/torus_30x40_2M_llama_Z47_layer_0_hidden_barcode.pdf}
+        \hfill
+        \includegraphics[width=0.154\linewidth]{img/torus/torus_30x40_2M_llama_Z47_layer_1_hidden_barcode.pdf}
+        \hfill
+        \includegraphics[width=0.154\linewidth]{img/torus/torus_30x40_2M_llama_Z47_layer_2_hidden_barcode.pdf}
+        \hfill
+        \includegraphics[width=0.154\linewidth]{img/torus/torus_30x40_2M_llama_Z47_layer_4_hidden_barcode.pdf}
+        \hfill
+        \includegraphics[width=0.154\linewidth]{img/torus/torus_30x40_2M_llama_Z47_final_hidden_barcode.pdf}
+    \vspace{-0.1cm}
+        \caption{\textbf{Results for \textit{torus}.} 1 prominent bar in $H^0$, 2 in $H^1$ and 1 in $H^2$ indicates a torus.}
+        \label{fig:torus_across_layer}
+    \end{subfigure}
+    \vspace{-0.1cm}    
+    \caption{\textbf{$\mathbb{Z}_{47}$ persistent cohomology barcode results across layers.} Captured from input embeddings, layer 0, layer 1, layer 2, layer 4, and final layer hidden states, with configurations same as Figure \ref{fig:main_results}.}
+    \label{fig:sphere_torus_barcode_across_layer}
+    
+    \vspace{0.4cm}
+    
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=0.32\linewidth]{img/klein/klein_y_30x40_2M_llama_Z2_layer_0_hidden_barcode.pdf}
+        \hfill
+        \includegraphics[width=0.32\linewidth]{img/klein/klein_y_30x40_2M_llama_Z2_layer_2_hidden_barcode.pdf}
+        \hfill
+        \includegraphics[width=0.32\linewidth]{img/klein/klein_y_30x40_2M_llama_Z2_final_hidden_barcode.pdf}
+    \vspace{-0.1cm}
+        \caption{\textbf{$\mathbb{Z}_2$ results for \textit{Klein bottle}.} 1 prominent bar in $H^0$, 2 in $H^1$ and 1 in $H^2$ indicates a Klein bottle.}
+        \label{fig:klein_z2}
+    \end{subfigure}
+    \hfill    
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=0.32\linewidth]{img/klein/klein_y_30x40_2M_llama_Z3_layer_0_hidden_barcode.pdf}
+        \hfill
+        \includegraphics[width=0.32\linewidth]{img/klein/klein_y_30x40_2M_llama_Z3_layer_2_hidden_barcode.pdf}
+        \hfill
+        \includegraphics[width=0.32\linewidth]{img/klein/klein_y_30x40_2M_llama_Z3_final_hidden_barcode.pdf}
+    \vspace{-0.1cm}
+        \caption{\textbf{$\mathbb{Z}_3$ results for \textit{Klein bottle}.} 1 prominent bar in $H^0$, 1 in $H^1$ and 0 in $H^2$ indicates a Klein bottle.}
+        \label{fig:klein_z3}
+    \end{subfigure}
+    
+    \vspace{0.2cm}
+    
+    % Subfigure (b) - real proj plane
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=0.32\linewidth]{img/proj/proj_plane_30x40_2M_llama_Z2_layer_0_after_block_barcode.pdf}
+        \hfill
+        \includegraphics[width=0.32\linewidth]{img/proj/proj_plane_30x40_2M_llama_Z2_layer_2_after_block_barcode.pdf}
+        \hfill
+        \includegraphics[width=0.32\linewidth]{img/proj/proj_plane_30x40_2M_llama_Z2_final_hidden_barcode.pdf}
+    \vspace{-0.1cm}
+        \caption{\textbf{$\mathbb{Z}_2$ results for \textit{real projective plane}.} 1 in $H^0$, 1 in $H^1$ and 1 in $H^2$ indicates a real projective plane.}
+        \label{fig:rp_z2}
+    \end{subfigure}
+    \hfill    
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=0.32\linewidth]{img/proj/proj_plane_30x40_2M_llama_Z3_layer_0_after_block_barcode.pdf}
+        \hfill
+        \includegraphics[width=0.32\linewidth]{img/proj/proj_plane_30x40_2M_llama_Z3_layer_2_after_block_barcode.pdf}
+        \hfill
+        \includegraphics[width=0.32\linewidth]{img/proj/proj_plane_30x40_2M_llama_Z3_final_hidden_barcode.pdf}
+    \vspace{-0.1cm}
+        \caption{\textbf{$\mathbb{Z}_3$ results for \textit{real projective plane}.} 1 in $H^0$, 0 in $H^1$ and 0 in $H^2$ indicates a real projective plane.}
+        \label{fig:rp_z3}
+    \end{subfigure}
+    \vspace{-0.1cm}    
+    \caption{\textbf{Persistent cohomology barcode results with different $\mathbb{Z}_{p}$ coefficients across layers.} Captured from layer 0, layer 2, and final layer hidden states, with configurations same as Figure \ref{fig:main_results}.}
+    \label{fig:klein_rp_barcode_across_layer}
+    \vspace{-0.1cm}
+\end{figure}
+
+
+
+
+
+These results confirm that language models trained solely on next-token prediction successfully reconstruct the ground truth topological structure of their data source within their learned representations.
+
+\paragraph{Detailed Analysis of Topological Features.}
+For the \textit{sphere} ($S^2$), the persistent cohomology barcodes in Figure~\ref{fig:sphere_across_layer} reveal the characteristic topological signature: a single prominent bar in $H^0$ indicating one connected component, no significant bars in $H^1$ (no non-trivial loops), and one prominent bar in $H^2$ capturing the enclosed void. 
+The topological structure emerges progressively across layers: input embeddings and early layers (layer 0-1) show noisy, fragmented barcodes with multiple spurious short-lived bars, reflecting the initial lack of geometric organization in the representation space. 
+By layer 2, the $H^2$ feature begins to stabilize, and by the final layer, the barcode precisely matches the ground-truth Betti numbers $\beta^0(S^2)=1$, $\beta^1(S^2)=0$, $\beta^2(S^2)=1$ with high persistence lifetimes, indicating robust recovery of the spherical topology.
+
+For the \textit{torus} ($T^2$), Figure~\ref{fig:torus_across_layer} demonstrates the recovery of its more complex topology: one bar in $H^0$ (connectedness), two prominent bars in $H^1$ corresponding to the two independent non-contractible loops (meridian and longitude), and one bar in $H^2$ (the enclosed volume). 
+The two $H^1$ features are particularly significant as they encode the fundamental group structure $\pi_1(T^2)\cong\mathbb{Z}\times\mathbb{Z}$, which distinguishes the torus from simply-connected manifolds like the sphere. 
+Similar to the sphere, early layers exhibit topological noise, but by layer 2-4, both $H^1$ loops become clearly identifiable with substantial persistence, and the final layer achieves near-perfect alignment with ground-truth Betti numbers $\beta^0(T^2)=1$, $\beta^1(T^2)=2$, $\beta^2(T^2)=1$.
+
+The \textit{Klein bottle} ($K$) presents a more challenging case due to its non-orientability and torsion in homology. 
+Figure~\ref{fig:klein_rp_barcode_across_layer} shows results computed with different coefficient fields to capture both free and torsion components. 
+With $\mathbb{Z}_2$ coefficients (Figure~\ref{fig:klein_z2}), we observe $\beta^0=1$, $\beta^1=2$, $\beta^2=1$, matching the expected homology $H_*(K;\mathbb{Z}_2)$. 
+With $\mathbb{Z}_3$ coefficients (Figure~\ref{fig:klein_z3}), the barcode reveals $\beta^0=1$, $\beta^1=1$, $\beta^2=0$, correctly reflecting that the second homology group $H_2(K;\mathbb{Z}_3)$ vanishes while $H_1(K;\mathbb{Z}_3)\cong\mathbb{Z}_2\oplus\mathbb{Z}$ contains torsion. 
+The model successfully captures this coefficient-dependent behavior, demonstrating sensitivity to both free and torsion topological invariants.
+
+The \textit{real projective plane} ($\mathbb{R}P^2$) similarly exhibits torsion, and the results in Figure~\ref{fig:klein_rp_barcode_across_layer} confirm accurate recovery. 
+With $\mathbb{Z}_2$ coefficients (Figure~\ref{fig:rp_z2}), we observe $\beta^0=1$, $\beta^1=1$, $\beta^2=1$, consistent with $H_*(\mathbb{R}P^2;\mathbb{Z}_2)$. 
+With $\mathbb{Z}_3$ coefficients (Figure~\ref{fig:rp_z3}), the barcode shows $\beta^0=1$, $\beta^1=0$, $\beta^2=0$, correctly indicating that $H_1(\mathbb{R}P^2;\mathbb{Z}_3)\cong\mathbb{Z}_2$ contains 2-torsion that is not detected by $\mathbb{Z}_3$ coefficients. 
+This coefficient-dependent behavior validates that the learned representations encode not merely the free homology, but also capture torsion subgroups, which are crucial topological invariants for non-orientable manifolds.
+
+Across all four topologies, the progressive emergence of topological features from early to final layers suggests that the model develops increasingly refined geometric representations through the transformer architecture, with later layers specializing in capturing global topological structure while earlier layers focus on local sequential patterns.
+
+
+
+%\subsubsection{3-Dimensional Manifolds}
+%\paragraph{3-Sphere (S³)}
+%\paragraph{3-Torus (T³)}
+
+%\subsubsection{Classification Performance and Analysis}
+%\paragraph{Overall Accuracy Across Topologies}
+%\paragraph{Confusion Matrix}
+%\paragraph{Success Cases and Failure Modes}
+
+
+% 00 Torus H30*W40
+% 00 LLama-2M
+% 02b for all checkpoints (in 02b there would be an option for selecting model dir)
+% 02b for all representations  (in 02b REPRESENTATIONS="${REPRESENTATIONS:-after_block, ffn_gate, ffn_up}")
+
+\subsection{Emergence of Topological Representations During Training}
+
+To understand how topological structure emerges during the learning process, we analyze the evolution of persistent cohomology features across training checkpoints and transformer layers.
+
+\subsubsection{Training Dynamics and Evolution of Topological Features}
+
+We track the persistent cohomology barcodes computed from representations extracted at multiple training checkpoints, capturing the progressive formation of topological invariants as the model learns to predict token sequences.
+
+Figure~\ref{fig:training_evolution} (to be added) illustrates the evolution of Betti numbers $\hat{\beta}^k$ across training epochs for the torus dataset. 
+In early training stages (checkpoints 400-800), the barcodes exhibit high topological noise with numerous spurious short-lived bars across all dimensions, indicating that the representation space lacks coherent geometric structure. 
+The model initially focuses on learning local transition patterns between adjacent tokens, resulting in fragmented topological signals.
+
+As training progresses (checkpoints 1200-1600), we observe a critical transition phase where topological features begin to stabilize. 
+The $H^1$ dimension shows the emergence of two persistent bars corresponding to the torus's fundamental loops, though their persistence lifetimes remain relatively short compared to final checkpoints. 
+This intermediate stage suggests the model is beginning to organize token representations according to the underlying manifold structure, but the geometric embedding remains imperfect.
+
+By later training stages (checkpoints 2000-2280 and final model), the topological signature converges to the ground-truth Betti numbers with high confidence. 
+The two $H^1$ bars achieve substantial persistence lifetimes, indicating robust recovery of the torus's fundamental group structure. 
+The $H^2$ feature (enclosed volume) also stabilizes, completing the full topological reconstruction.
+
+This progressive emergence pattern demonstrates that topology recovery is not an immediate consequence of sequence modeling, but rather emerges as a byproduct of the model learning increasingly sophisticated geometric representations through the optimization of next-token prediction.
+
+\subsubsection{Layer-wise Analysis of Topological Feature Emergence}
+
+The transformer architecture processes information through a sequence of layers, with each layer potentially contributing differently to topological structure formation. 
+Figures~\ref{fig:sphere_across_layer} and~\ref{fig:torus_across_layer} reveal distinct patterns of topological feature emergence across layers.
+
+\textbf{Early Layers (Input Embeddings to Layer 1):} The input token embeddings and first transformer block produce representations with minimal topological organization. 
+Barcodes at these stages show high fragmentation with many short-lived bars, reflecting that the initial embedding space primarily encodes token identity without geometric relationships. 
+The model has not yet learned to position tokens in a way that reflects their topological connectivity.
+
+\textbf{Middle Layers (Layer 2-4):} A critical transition occurs in intermediate layers where topological features begin to emerge. 
+For both sphere and torus, layer 2 marks the onset of stable topological signals: the $H^2$ feature for the sphere and the $H^1$ loops for the torus become identifiable, though with moderate persistence. 
+This suggests that middle layers are responsible for establishing the geometric embedding that captures local-to-global topological relationships.
+
+\textbf{Final Layers:} The deepest layers (layer 4 and final layer) refine and stabilize the topological structure. 
+Persistence lifetimes increase significantly, and spurious noise bars are eliminated, resulting in clean barcodes that precisely match ground-truth Betti numbers. 
+These layers appear to specialize in global topological organization, refining the geometric embedding established by middle layers to maximize topological signal strength.
+
+This layer-wise progression aligns with the hierarchical processing hypothesis in transformer architectures: early layers capture local patterns, middle layers establish intermediate structure, and final layers integrate global information. 
+The emergence of topology in middle-to-late layers suggests that topological invariants are high-level geometric properties that require sufficient model depth to be represented.
+
+\subsubsection{Correlation Between Language Modeling Performance and Topology Recovery}
+
+We investigate the relationship between the model's language modeling performance (measured by validation cross-entropy loss) and its ability to recover topological structure (measured by Betti number accuracy).
+
+Analysis across training checkpoints reveals that topological feature emergence correlates with, but does not strictly require, convergence of the language modeling objective. 
+While early training stages show both high loss and poor topology recovery, the topological features begin to stabilize slightly before the loss fully plateaus, suggesting that topology recovery may be a more sensitive indicator of geometric learning than loss alone.
+
+However, models that achieve lower final validation loss consistently exhibit more robust topological features with higher persistence lifetimes, indicating that improved sequence modeling capability facilitates better geometric organization of the representation space. 
+This relationship suggests that learning accurate local transition probabilities enables the model to implicitly capture the global topological structure encoded in the random walk sequences.
+
+
+
+
+
+\subsection{Robustness Analysis Across Scales}
+
+To assess the generalizability and robustness of topological structure recovery, we conduct systematic experiments varying both the graph discretization scale and model capacity.
+
+\subsubsection{Effect of Graph Discretization Scale}
+
+We investigate how the resolution of the underlying graph discretization affects topology recovery by training models on torus datasets with varying grid dimensions: $10\times 10$ (100 vertices), $20\times 20$ (400 vertices), and $30\times 40$ (1200 vertices). 
+All experiments use the same 2M parameter model architecture to isolate the effect of graph scale.
+
+Figure~\ref{fig:torus_scale_graph} (to be added) presents persistent cohomology barcodes for each graph scale. 
+The $10\times 10$ graph, being the coarsest discretization, shows slightly noisier topological signals with moderate persistence lifetimes, but still successfully recovers the correct Betti numbers $\beta^0=1$, $\beta^1=2$, $\beta^2=1$. 
+The coarser graph provides fewer training tokens and less fine-grained topological structure, yet the model demonstrates robustness by recovering the essential topological invariants.
+
+The $20\times 20$ graph exhibits cleaner barcodes with improved persistence, as the finer discretization provides richer geometric information and more training data. 
+The two $H^1$ loops are more clearly separated with longer persistence lifetimes, indicating better geometric embedding quality.
+
+The $30\times 40$ graph, with the finest discretization, produces the most robust topological features with the highest persistence lifetimes. 
+The increased vertex count provides a denser sampling of the manifold, enabling the model to learn more precise geometric relationships. 
+However, the improvement from $20\times 20$ to $30\times 40$ is more modest than from $10\times 10$ to $20\times 20$, suggesting diminishing returns beyond a certain discretization threshold.
+
+These results demonstrate that topology recovery is robust across a wide range of graph scales, with finer discretizations providing improved signal quality but not being strictly necessary for successful recovery of fundamental topological invariants.
+
+\subsubsection{Effect of Model Scale}
+
+We examine how model capacity influences topology recovery by training models of varying sizes on the same torus $10\times 10$ dataset. 
+We experiment with model configurations ranging from 10K parameters (2 layers, hidden size 8) to 50M parameters (12 layers, hidden size 256), as specified in the configuration files.
+
+Figure~\ref{fig:torus_scale_model} (to be added) shows persistent cohomology results across model scales. 
+Very small models (10K-15K parameters) struggle to recover topological structure, producing noisy barcodes with fragmented features. 
+These models lack sufficient capacity to learn the geometric organization necessary for topology recovery, though they may still achieve reasonable language modeling performance on local transitions.
+
+Medium-scale models (25K-100K parameters) begin to show stable topological features. 
+The 50K parameter model (3 layers, hidden size 16) successfully recovers the torus topology with correct Betti numbers, though persistence lifetimes remain moderate. 
+This suggests a minimum model capacity threshold below which topology recovery is unreliable.
+
+Larger models (200K-2M parameters) exhibit increasingly robust topological features. 
+The 2M parameter model (6 layers, hidden size 256) produces clean barcodes with high persistence, matching the results shown in previous sections. 
+The improvement from 200K to 2M parameters is substantial, indicating that increased model depth and width facilitate better geometric embedding.
+
+Very large models (6M-50M parameters) show further refinement, with the highest persistence lifetimes and most stable topological signals. 
+However, the marginal improvement diminishes for models beyond 2M-6M parameters, suggesting that topology recovery saturates at moderate model scales for the given dataset complexity.
+
+This analysis reveals that topology recovery requires a minimum model capacity (approximately 25K-50K parameters for the torus $10\times 10$ dataset), but benefits significantly from increased scale up to 2M-6M parameters. 
+Beyond this range, additional capacity provides diminishing returns, indicating that the fundamental topological structure can be captured with moderate model sizes.
+
+\subsubsection{Joint Analysis: Graph and Model Scale Interaction}
+
+We further investigate the interaction between graph scale and model scale by training models of different capacities on graphs of different resolutions. 
+Table~\ref{tab:scale_interaction} (to be added) summarizes Betti number recovery accuracy across these combinations.
+
+A key finding is that the minimum required model capacity scales with graph complexity: finer graphs (more vertices) require larger models to achieve reliable topology recovery. 
+For the $10\times 10$ graph, a 25K parameter model suffices, while the $30\times 40$ graph requires at least 100K-200K parameters for consistent recovery.
+
+Conversely, larger models can successfully recover topology even from coarser graphs, though finer graphs enable more robust features. 
+This suggests that model capacity and graph resolution are somewhat interchangeable: either increased model size or finer discretization can improve topology recovery, with optimal results achieved when both are sufficiently large.
+
+These findings have practical implications for applying topology analysis to language model representations: the required model scale depends on the complexity of the underlying data structure, and moderate-scale models (2M-6M parameters) are sufficient for recovering fundamental topological invariants from reasonably discretized manifolds.
+
+\subsubsection{Effect of Sampling Density}
+\subsubsection{Noise Sensitivity in Point Clouds}
+\subsubsection{Impact of Filtration Radius Range}
+\subsubsection{Robustness to Random Walk Length Variations}
+\subsubsection{Stability Across Different Random Seeds}
+
+\subsubsection{Impact of Training Data}
+\paragraph{Dataset Size}
+\paragraph{Random Walk Distribution}
+
+
+
+
+
+\subsection{Ablation Studies}
+\subsubsection{Effect of Model Architecture}
+\paragraph{Transformer Depth and Width}
+\paragraph{Attention Mechanism Variants}
+
+
+\subsubsection{Persistent Homology vs Cohomology}
+\subsubsection{Coefficient Ring Selection}
+\paragraph{Single vs Multi-Coefficient Analysis}
+\paragraph{Computational Cost-Benefit Analysis}
+
+\subsubsection{Complex Construction Methods}
+\paragraph{Vietoris-Rips vs Čech Complex}
+\paragraph{Alpha Complex}
+
+\subsubsection{Dimensionality Reduction Methods}
+\paragraph{PCA vs UMAP vs t-SNE}

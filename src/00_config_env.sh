@@ -13,8 +13,8 @@
 # ============================================================================
 
 # Grid dimensions
-export H=${H:-30}
-export W=${W:-40}
+export H=${H:-25}
+export W=${W:-25}
 
 # Topology configuration
 # Available topology types:
@@ -31,7 +31,7 @@ export W=${W:-40}
 #   - hemisphere_n   : Northern hemisphere (open boundary) (H=latitude/radial-to-pole, W=longitude/azimuthal)
 #   - hemisphere_s   : Southern hemisphere (open boundary) (H=latitude/radial-to-pole, W=longitude/azimuthal)
 #   - sphere         : Sphere (single point S, all boundaries connect to S) (H≈latitude, W≈longitude, interior points only)
-export TOPOLOGY=${TOPOLOGY:-"torus"}
+export TOPOLOGY=${TOPOLOGY:-"sphere_two"}
 
 # Derived configuration - always recomputed from H, W, TOPOLOGY
 # DATASET_NAME is automatically generated from topology and dimensions
@@ -40,7 +40,7 @@ if [ -n "${H}" ] && [ -n "${W}" ] && [ -n "${TOPOLOGY}" ]; then
 fi
 
 # Run configuration (can be overridden)
-export RUN_NAME=${RUN_NAME:-"50K_llama"}
+export RUN_NAME=${RUN_NAME:-"2M_llama"}
 
 # Working directory structure:
 #   - Data-related outputs (graphs, walks, prepared datasets): {DATASET_NAME}/

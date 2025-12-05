@@ -26,7 +26,7 @@ source "${SCRIPT_DIR}/00_config_env.sh"
 # Representation types to extract (default: after_block)
 # Options: residual_before, after_attention, after_block, ffn_gate, ffn_up
 # Multiple can be specified: REPRESENTATIONS="after_block ffn_gate ffn_up"
-REPRESENTATIONS="${REPRESENTATIONS:-after_block}"
+REPRESENTATIONS="${REPRESENTATIONS:-after_block ffn_gate ffn_up}"
 
 echo ""
 echo "Configuration:"

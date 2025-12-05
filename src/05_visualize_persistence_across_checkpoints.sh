@@ -36,7 +36,7 @@ REPRESENTATIONS=("final_hidden" "input_embeds" \
     "layer_5_after_block" "layer_5_ffn_up" "layer_5_ffn_gate")
 K_VALUES=()
 K_H0="1"
-K_H1="2"
+K_H1="1"
 K_H2="1"
 OUTPUT=""
 

@@ -132,11 +132,22 @@ def plot_persistence_across_checkpoints(
     available_dims = get_available_dimensions(checkpoint_data[0][2])
     
     # Filter k_values to only include available dimensions
-    k_values = {dim: k_values[dim] for dim in k_values if dim in available_dims}
+    # Note: k=0 is valid and will still be processed to plot averages
+    # Keep dimensions with k=0 as long as they exist in the data
+    filtered_k_values = {}
+    for dim, k_val in k_values.items():
+        if dim in available_dims:
+            # Include dimension if it's available, regardless of k value (even k=0)
+            filtered_k_values[dim] = k_val
+    
+    k_values = filtered_k_values
     
     if not k_values:
         print(f"Error: No valid dimensions found. Available: {available_dims}", file=sys.stderr)
         return
+    
+    # Debug: print k_values being processed
+    print(f"Processing dimensions with k-values: {k_values}", file=sys.stderr)
     
     # Prepare data for plotting - map checkpoint indices to actual checkpoint numbers
     checkpoint_x_coords = []  # Actual x-coordinates (checkpoint numbers)
@@ -167,45 +178,56 @@ def plot_persistence_across_checkpoints(
     
     # Plot each dimension
     for dim_idx, (dim, k) in enumerate(k_values.items()):
+        print(f"Processing dimension {dim} with k={k}", file=sys.stderr)
         color = colors[dim_idx % len(colors)]
         line_style = line_styles[dim_idx % len(line_styles)]
         
-        # Extract top k bars for each checkpoint
+        # Extract top k bars for each checkpoint (only if k > 0)
         all_persistences = []  # List of lists, one per checkpoint
         all_averages = []  # List of mean persistence values
         
         for checkpoint_name, checkpoint_num, data in checkpoint_data:
-            top_k = extract_top_k_bars(data, dim, k)
+            # Extract top k bars only if k > 0
+            if k > 0:
+                top_k = extract_top_k_bars(data, dim, k)
+            else:
+                top_k = []
             all_persistences.append(top_k)
             
-            # Extract mean persistence
-            if dim in data and 'mean_persistence' in data[dim]:
-                all_averages.append(data[dim]['mean_persistence'])
+            # Extract mean persistence (always, regardless of k value)
+            # Check if dimension exists in data and has mean_persistence
+            if dim in data:
+                dim_data = data[dim]
+                if isinstance(dim_data, dict) and 'mean_persistence' in dim_data:
+                    all_averages.append(dim_data['mean_persistence'])
+                else:
+                    all_averages.append(None)
             else:
                 all_averages.append(None)
         
-        # Plot top k bars with 100% opacity
-        max_bars = max(len(p) for p in all_persistences)
-        
-        for bar_idx in range(max_bars):
-            values = []
-            x_coords = []
+        # Plot top k bars with 100% opacity (only if k > 0)
+        if k > 0:
+            max_bars = max(len(p) for p in all_persistences) if all_persistences else 0
             
-            for checkpoint_idx, persistences in enumerate(all_persistences):
-                if bar_idx < len(persistences):
-                    values.append(persistences[bar_idx])
-                    x_coords.append(checkpoint_x_coords[checkpoint_idx])
-            
-            if values:
-                # Use actual checkpoint numbers for x-axis
-                label = f'{dim} Bar {bar_idx + 1}'
-                ax.plot(x_coords, values, 
-                       marker='o', markersize=3, alpha=1.0,  # 100% opacity
-                       color=color, linestyle=line_style,
-                       linewidth=1.5,
-                       label=label)
+            for bar_idx in range(max_bars):
+                values = []
+                x_coords = []
+                
+                for checkpoint_idx, persistences in enumerate(all_persistences):
+                    if bar_idx < len(persistences):
+                        values.append(persistences[bar_idx])
+                        x_coords.append(checkpoint_x_coords[checkpoint_idx])
+                
+                if values:
+                    # Use actual checkpoint numbers for x-axis
+                    label = f'{dim} Bar {bar_idx + 1}'
+                    ax.plot(x_coords, values, 
+                           marker='o', markersize=3, alpha=1.0,  # 100% opacity
+                           color=color, linestyle=line_style,
+                           linewidth=1.5,
+                           label=label)
         
-        # Plot average line with 50% opacity
+        # Plot average line with 50% opacity (always, if available, regardless of k value)
         avg_values = []
         avg_x_coords = []
         
@@ -216,11 +238,14 @@ def plot_persistence_across_checkpoints(
         
         if avg_values:
             label = f'{dim} Average'
+            print(f"  Plotting average for {dim}: {len(avg_values)} data points", file=sys.stderr)
             ax.plot(avg_x_coords, avg_values,
                    marker='', alpha=0.5,  # 50% opacity, no markers
                    color=color, linestyle='-',
                    linewidth=1.5,
                    label=label)
+        else:
+            print(f"  No average data found for {dim} (k={k})", file=sys.stderr)
 
     # Set x-axis to logarithmic scale
     ax.ticklabel_format(useMathText=True)
@@ -334,11 +359,12 @@ def main():
     k_values = {}
     
     # First, try dimension-specific k values
-    if args.k_H0:
+    # Use 'is not None' to allow k=0 values
+    if args.k_H0 is not None:
         k_values['H0'] = args.k_H0
-    if args.k_H1:
+    if args.k_H1 is not None:
         k_values['H1'] = args.k_H1
-    if args.k_H2:
+    if args.k_H2 is not None:
         k_values['H2'] = args.k_H2
     
     # Then, use --k argument if provided
