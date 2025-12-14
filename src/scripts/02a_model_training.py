@@ -175,6 +175,8 @@ def main():
                       help='Directory for logs (default: {output_dir}/logs)')
     parser.add_argument('--save_total_limit', type=str, default='2',
                       help='Maximum number of checkpoints to keep (integer) or "all" to save all checkpoints')
+    parser.add_argument('--resume_from_checkpoint', type=str, default=None,
+                      help='Path to checkpoint directory to resume training from')
     parser.add_argument('--no_cuda', action='store_true',
                       help='Force CPU training')
     
@@ -221,17 +223,14 @@ def main():
                 print(f"  Current PyTorch version: {torch.__version__}")
                 
                 if props.major >= 12:
-                    print(f"\n  ✗ ERROR: Blackwell architecture (sm_{props.major}{props.minor}) is not supported by current PyTorch.")
-                    print(f"  PyTorch {torch.__version__} does not have CUDA kernels for sm_120.")
-                    print(f"  This will cause 'no kernel image available' errors during training.")
-                    print(f"\n  Solutions:")
-                    print(f"  1. Use CPU training: USE_CPU=true ./02a_model_training.sh")
-                    print(f"  2. Try PyTorch nightly (may have experimental support):")
-                    print(f"     pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu124")
-                    print(f"  3. Wait for official PyTorch support")
-                    print(f"\n  Automatically falling back to CPU training...")
-                    args.no_cuda = True
-                    actual_device = "CPU"
+                    print(f"\n  ⚠ WARNING: Blackwell architecture (sm_{props.major}{props.minor}) may not be fully supported.")
+                    print(f"  PyTorch {torch.__version__} may not have optimized CUDA kernels for sm_120.")
+                    print(f"  Training will proceed with GPU, but you may encounter issues.")
+                    print(f"  If you encounter 'no kernel image available' errors, try:")
+                    print(f"    1. Use CPU training: USE_CPU=true ./12a_combined_model_training.sh")
+                    print(f"    2. Try PyTorch nightly (may have experimental support):")
+                    print(f"       pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu124")
+                    print(f"  Continuing with GPU training...")
                 elif props.major == 10:
                     print(f"  ⚠ Hopper architecture (sm_{props.major}{props.minor}) may require PyTorch 2.1+")
                     print(f"  If you encounter errors, try: pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu124")
@@ -314,9 +313,16 @@ def main():
     print(f"  Max position embeddings: {config.max_position_embeddings}")
     print(f"  Rope theta: {config.rope_theta}")
     
-    # Initialize model
+    # Initialize or load model
     print(f"\nInitializing model...")
-    model = LlamaForCausalLM(config)
+    if args.resume_from_checkpoint and os.path.exists(args.resume_from_checkpoint):
+        print(f"  Loading model from checkpoint: {args.resume_from_checkpoint}")
+        model = LlamaForCausalLM.from_pretrained(args.resume_from_checkpoint)
+        print(f"  ✓ Model loaded from checkpoint")
+    else:
+        model = LlamaForCausalLM(config)
+        print(f"  ✓ Model initialized from config")
+    print(f"Model: {model}")
     
     # Count parameters
     total, trainable, emb, non_emb = count_parameters(model)
@@ -351,9 +357,14 @@ def main():
     # Determine device for model placement
     device = torch.device("cuda" if cuda_available and not args.no_cuda else "cpu")
     
+    # Check if resuming from checkpoint
+    is_resuming = args.resume_from_checkpoint and os.path.exists(args.resume_from_checkpoint)
+    if is_resuming:
+        print(f"\n  Resuming training from checkpoint: {args.resume_from_checkpoint}")
+    
     training_args = TrainingArguments(
         output_dir=args.output_dir,
-        overwrite_output_dir=True,
+        overwrite_output_dir=not is_resuming,  # Don't overwrite when resuming
         num_train_epochs=args.epochs,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
@@ -451,7 +462,9 @@ def main():
         print(f"  Reserved: {torch.cuda.memory_reserved(0) / 1024**3:.2f} GB")
         print("")
     
-    trainer.train()
+    # Resume from checkpoint if provided
+    resume_from_checkpoint = args.resume_from_checkpoint if is_resuming else None
+    trainer.train(resume_from_checkpoint=resume_from_checkpoint)
     
     # Report final GPU memory usage
     if cuda_available and not args.no_cuda:

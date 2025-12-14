@@ -58,6 +58,7 @@ export NEIGH=${NEIGH:-8}
 #export MODEL_DIR="${MODEL_DIR:-${WORK_DIR}/final_model}" # or checkpoints directory
 export MODEL_DIR="${MODEL_DIR:-${WORK_DIR}/final_model}"
 export REPRESENTATION_DIR="${REPRESENTATION_DIR:-${MODEL_DIR}/token_representations}"
+export SOURCE_TOKEN_REPRESENTATION_DIR="${SOURCE_TOKEN_REPRESENTATION_DIR:-${MODEL_DIR}/source_token_representations}"
 export PCA_DIR="${PCA_DIR:-${MODEL_DIR}/pca_result}"
 export FUZZY_NEIGHBORHOOD_DIR="${FUZZY_NEIGHBORHOOD_DIR:-${MODEL_DIR}/fuzzy_neighborhood}"
 export UMAP_DIR="${UMAP_DIR:-${MODEL_DIR}/umap_result}"
