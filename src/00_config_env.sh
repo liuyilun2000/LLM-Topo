@@ -40,7 +40,7 @@ if [ -n "${H}" ] && [ -n "${W}" ] && [ -n "${TOPOLOGY}" ]; then
 fi
 
 # Run configuration (can be overridden)
-export RUN_NAME=${RUN_NAME:-"2M_llama"}
+export RUN_NAME=${RUN_NAME:-"12M_llama"}
 
 # Working directory structure:
 #   - Data-related outputs (graphs, walks, prepared datasets): {DATASET_NAME}/
@@ -56,7 +56,7 @@ export NEIGH=${NEIGH:-8}
 
 
 #export MODEL_DIR="${MODEL_DIR:-${WORK_DIR}/final_model}" # or checkpoints directory
-export MODEL_DIR="${MODEL_DIR:-${WORK_DIR}/final_model}"
+export MODEL_DIR="${MODEL_DIR:-${WORK_DIR}/checkpoint-7900}"
 export REPRESENTATION_DIR="${REPRESENTATION_DIR:-${MODEL_DIR}/token_representations}"
 export SOURCE_TOKEN_REPRESENTATION_DIR="${SOURCE_TOKEN_REPRESENTATION_DIR:-${MODEL_DIR}/source_token_representations}"
 export PCA_DIR="${PCA_DIR:-${MODEL_DIR}/pca_result}"

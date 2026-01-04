@@ -40,6 +40,10 @@ def select_top_k(persistence, top_k):
     if len(persistence) == 0:
         return np.array([])
     
+    # If top_k is 0, return all False (no significance markers)
+    if top_k <= 0:
+        return np.array([False] * len(persistence))
+    
     if len(persistence) <= top_k:
         # All values are top-k
         return np.array([True] * len(persistence))
@@ -63,7 +67,7 @@ def plot_persistence_barcode(key, results, output_file, max_bars=30, p_value=0.0
     - Shared x-axis (radius)
     - Infinite values are normalized to ceiling of largest finite value at loading
     - Top-k bars globally are selected based on difference above their dimension's average
-    - Bars with top-k largest differences above mean are marked with stars
+    - Bars with top-k largest differences above mean are marked with asterisks
     
     Args:
         key: representation name
@@ -77,7 +81,7 @@ def plot_persistence_barcode(key, results, output_file, max_bars=30, p_value=0.0
         dict: Statistics for each dimension including mean, std, significant bars, etc.
     """
     # Use global top-k method: mark top-k bars with largest difference above their dimension's mean
-    # Top-k bars globally (based on difference above mean) are marked with star (★)
+    # Top-k bars globally (based on difference above mean) are marked with asterisk (*)
     if 'persistence_diagrams' not in results:
         print(f"  Warning: No persistence diagrams found for {key}")
         return None
@@ -261,7 +265,7 @@ def plot_persistence_barcode(key, results, output_file, max_bars=30, p_value=0.0
         dim_significance_threshold[dim_key] = global_significance_threshold if global_significance_threshold is not None else 0.0
     
     # Process each homology dimension
-    fig, axes = plt.subplots(3, 1, figsize=(3, 5), sharex=True)
+    fig, axes = plt.subplots(3, 1, figsize=(2, 3.5), sharex=True)
     
     for idx, (dim_key, dim_label) in enumerate(zip(dims, dim_labels)):
         ax = axes[idx]
@@ -324,13 +328,15 @@ def plot_persistence_barcode(key, results, output_file, max_bars=30, p_value=0.0
                        color='green', alpha=0.8, edgecolor='darkgreen', linewidth=0.5,
                        zorder=1)
                 
-                # Mark significant bars with star
+                # Mark significant bars with marker (perfectly centered)
                 if is_significant:
-                    # Place star slightly to the right of the bar end
-                    star_offset = 0.05
-                    ax.text(death + star_offset, i, '★',
-                           fontsize=6, color='black', rotation=0, ha='left',
-                           verticalalignment='center', zorder=2)
+                    # Place marker slightly to the right of the bar end with more spacing
+                    marker_offset = 0.2
+                    marker_x = death + marker_offset
+                                        
+                    ax.plot(marker_x, i, marker='*', 
+                           markersize=6, color='black', linestyle='None',
+                           zorder=2, markeredgewidth=0, clip_on=False)
             
             # Hide all y-ticks
             ax.set_yticks([])
@@ -418,7 +424,7 @@ def main():
     print(f"Max bars per dimension: {args.max_bars}")
     print(f"Top-k: {args.top_k} (global across all dimensions, based on difference above mean)")
     print(f"Using global top-k method approach (difference above dimension's average)")
-    print(f"Stars mark top-k bars with largest difference above their dimension's mean")
+    print(f"Asterisks (*) mark top-k bars with largest difference above their dimension's mean")
     
     # Process each representation
     for key in keys_to_process:

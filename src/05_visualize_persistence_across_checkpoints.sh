@@ -28,15 +28,25 @@ source "${SCRIPT_DIR}/00_config_env.sh"
 
 # Default values
 REPRESENTATIONS=("final_hidden" "input_embeds" \
-    "layer_0_after_block" "layer_0_ffn_up" "layer_0_ffn_gate" \
-    "layer_1_after_block" "layer_1_ffn_up" "layer_1_ffn_gate" \
-    "layer_2_after_block" "layer_2_ffn_up" "layer_2_ffn_gate" \
-    "layer_3_after_block" "layer_3_ffn_up" "layer_3_ffn_gate" \
-    "layer_4_after_block" "layer_4_ffn_up" "layer_4_ffn_gate" \
-    "layer_5_after_block" "layer_5_ffn_up" "layer_5_ffn_gate")
+    "layer_0_after_block" "layer_1_after_block" "layer_2_after_block" "layer_3_after_block" "layer_4_after_block" "layer_5_after_block" \
+    "layer_6_after_block" "layer_7_after_block" "layer_8_after_block" "layer_9_after_block" "layer_10_after_block" "layer_11_after_block" )
+
+#    "layer_0_ffn_up" "layer_0_ffn_gate" \
+#    "layer_1_ffn_up" "layer_1_ffn_gate" \
+#    "layer_2_ffn_up" "layer_2_ffn_gate" \
+#    "layer_3_ffn_up" "layer_3_ffn_gate" \
+#    "layer_4_ffn_up" "layer_4_ffn_gate" \
+#    "layer_5_ffn_up" "layer_5_ffn_gate" \
+#    "layer_6_ffn_up" "layer_6_ffn_gate" \
+#    "layer_7_ffn_up" "layer_7_ffn_gate" \
+#    "layer_8_ffn_up" "layer_8_ffn_gate" \
+#    "layer_9_ffn_up" "layer_9_ffn_gate" \
+#    "layer_10_ffn_up" "layer_10_ffn_gate" \
+#    "layer_11_ffn_up" "layer_11_ffn_gate")
+
 K_VALUES=()
 K_H0="1"
-K_H1="1"
+K_H1="2"
 K_H2="1"
 OUTPUT=""
 
