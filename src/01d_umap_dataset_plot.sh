@@ -21,12 +21,11 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Graph directory (contains adjacency/distance matrices)
-GRAPH_DIR="${GRAPH_DIR:-./${DATA_DIR}/graph}"
+# Variables GRAPH_DIR, DATA_DIR, N, K_EDGE, ITERS, TOPOLOGY_RULE are loaded from 00_config_env.sh
 
 # Walks CSV file - construct dataset name to match sequence generation output
-# Use topology rule directly (already in capital letter form)
-DATASET_NAME_PYTHON="${TOPOLOGY_RULE}_n${N}_k${K_EDGE}_iter${ITERS}"
+# Use prefix + topology rule: {PREFIX}_{TOPOLOGY_RULE}_n{N}_k{K_EDGE}_iter{ITERS}
+DATASET_NAME_PYTHON="${TOPOLOGY_PREFIX}_${TOPOLOGY_RULE}_n${N}_k${K_EDGE}_iter${ITERS}"
 WALKS_CSV="${WALKS_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME_PYTHON}.csv}"
 
 # Matrix type: "adjacency" or "distance" (default: distance if available, else adjacency)
@@ -129,7 +128,7 @@ echo "Generating visualization..."
 
 # Build and run Python script
 if [ -n "$WALK_ID" ]; then
-    python scripts/93d_umap_dataset_plot.py \
+    python ../scripts/01d_umap_dataset_plot.py \
         --graph_dir "$GRAPH_DIR" \
         --dataset_name "$DATASET_NAME_PYTHON" \
         --matrix_type "$MATRIX_TYPE" \
@@ -142,7 +141,7 @@ if [ -n "$WALK_ID" ]; then
         $(if [ -n "$UMAP_RANDOM_STATE" ]; then echo "--umap_random_state $UMAP_RANDOM_STATE"; fi) \
         --max_length "$MAX_LENGTH"
 else
-    python scripts/93d_umap_dataset_plot.py \
+    python ../scripts/01d_umap_dataset_plot.py \
         --graph_dir "$GRAPH_DIR" \
         --dataset_name "$DATASET_NAME_PYTHON" \
         --matrix_type "$MATRIX_TYPE" \

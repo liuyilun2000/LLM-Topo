@@ -10,7 +10,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 import pickle
 
-from utils import load_representations
+from data_loading_utils import load_representations
 
 
 def standardize_data(data):

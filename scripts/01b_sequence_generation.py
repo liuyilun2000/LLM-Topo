@@ -19,64 +19,11 @@ Output files:
 import argparse
 import csv
 import os
-import re
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-
-def load_graph(graph_dir: str, dataset_name: str):
-    """
-    Load graph representation from saved files using dataset_name.
-    
-    Args:
-        graph_dir: Directory containing graph files (e.g., "./output")
-        dataset_name: Name of the dataset (e.g., "aba^-1b^-1_n2_k25_iter200")
-        
-    Returns:
-        A: Adjacency matrix (N x N)
-        labels: Node labels (list of strings)
-        nodes_df: Node information DataFrame
-        coords: Coordinates (N x 3) or None
-    """
-    
-    # 1. Load adjacency matrix (A_{dataset_name}_labeled.csv)
-    A_labeled_path = os.path.join(graph_dir, f"A_{dataset_name}_labeled.csv")
-    if not os.path.exists(A_labeled_path):
-        raise FileNotFoundError(f"Graph file not found: {A_labeled_path}\n"
-                               f"Please make sure you run the generation script first with matching parameters.")
-    
-    print(f"Loading adjacency matrix from: {A_labeled_path}")
-    dfA = pd.read_csv(A_labeled_path, index_col=0)
-    labels = dfA.index.astype(str).tolist()
-    A = dfA.values.astype(np.int8)
-    
-    # 2. Load nodes information (nodes_{dataset_name}.csv)
-    nodes_path = os.path.join(graph_dir, f"nodes_{dataset_name}.csv")
-    if os.path.exists(nodes_path):
-        nodes_df = pd.read_csv(nodes_path, index_col=0)
-    else:
-        nodes_df = pd.DataFrame({"node_id": labels})
-    
-    # 3. Load coordinates (coords_{dataset_name}.csv)
-    coords_path = os.path.join(graph_dir, f"coords_{dataset_name}.csv")
-    coords = None
-    if os.path.exists(coords_path):
-        try:
-            df_coords = pd.read_csv(coords_path, index_col=0)
-            if set(['x', 'y', 'z']).issubset(df_coords.columns):
-                coords = df_coords[['x', 'y', 'z']].values
-            else:
-                print(f"[Warn] Coords file found but columns mismatch. Expected x,y,z.")
-        except Exception as e:
-            print(f"[Warn] Failed to load coords: {e}")
-    
-    return A, labels, nodes_df, coords
-
-
-def build_neighbors_from_A(A: np.ndarray):
-    """Build neighbor list from adjacency matrix."""
-    return [np.where(A[i] == 1)[0].astype(np.int64) for i in range(A.shape[0])]
+from graph_utils import load_graph, build_neighbors_from_A
 
 
 def deficit_weights(visits: np.ndarray, target: float, temperature: float):
@@ -170,6 +117,8 @@ def main():
     # Dataset Identifier Parameters (Must match generation script)
     ap.add_argument("--topology", type=str, required=True,
                     help="Topology rule string: use capital letters for reversed edges (A=a^-1, B=b^-1, etc.). Example: 'abAB' for torus")
+    ap.add_argument("--prefix", type=str, default=None,
+                    help="Topology prefix for dataset naming (e.g., 'torus', 'klein', 'sphere'). Must match the prefix used in graph generation.")
     ap.add_argument("--n", type=int, required=True,
                     help="n in 2n-polygon (e.g., 2)")
     ap.add_argument("--K_edge", type=int, required=True,
@@ -202,9 +151,12 @@ def main():
     
     args = ap.parse_args()
     
-    # Construct dataset name to match generator
+    # Construct dataset name to match generator (must include prefix if used in graph generation)
     # Topology rule should already be in capital letter form (e.g., abAB instead of aba^-1b^-1)
-    dataset_name = f"{args.topology}_n{args.n}_k{args.K_edge}_iter{args.iters}"
+    if args.prefix:
+        dataset_name = f"{args.prefix}_{args.topology}_n{args.n}_k{args.K_edge}_iter{args.iters}"
+    else:
+        dataset_name = f"{args.topology}_n{args.n}_k{args.K_edge}_iter{args.iters}"
     
     # Auto-generate output paths if not provided
     data_dir = "./data/sequences"

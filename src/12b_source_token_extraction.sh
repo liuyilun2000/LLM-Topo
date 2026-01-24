@@ -81,7 +81,7 @@ if [ -f "$REPRESENTATION_DIR/token_representations.npz" ]; then
 fi
 
 echo "Extracting source token representations..."
-python scripts/12b_source_token_extraction.py \
+python ../scripts/12b_source_token_extraction.py \
     --model_dir "$MODEL_DIR" \
     --dataset_dir "$DATASET_DIR" \
     --output_dir "$REPRESENTATION_DIR" \

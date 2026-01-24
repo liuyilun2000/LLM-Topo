@@ -39,7 +39,7 @@ if [ ! -d "$DATASET_DIR" ]; then
 fi
 
 echo "Viewing dataset examples..."
-python scripts/12c_view_combined_dataset.py \
+python ../scripts/12c_view_combined_dataset.py \
     --dataset_dir "$DATASET_DIR" \
     --num_examples "$NUM_EXAMPLES" \
     --split "$SPLIT" \

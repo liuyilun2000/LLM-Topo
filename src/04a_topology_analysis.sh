@@ -108,13 +108,13 @@ RIPSER_ARGS="$RIPSER_ARGS --ripser_coeff $RIPSER_COEFF"
 
 if [ "$INPUT_MODE" = "distance_matrix" ]; then
     # Mode 1: Distance matrix input
-    python scripts/04a_topology_analysis.py \
+    python ../scripts/04a_topology_analysis.py \
         --fuzzy_dir "$FUZZY_NEIGHBORHOOD_DIR" \
         --output_dir "$TOPOLOGY_ANALYSIS_DIR" \
         $RIPSER_ARGS
 else
     # Mode 2: Data representation input
-    python scripts/04a_topology_analysis.py \
+    python ../scripts/04a_topology_analysis.py \
         --data_dir "$INPUT_DIR" \
         --output_dir "$TOPOLOGY_ANALYSIS_DIR" \
         --data_type "$DATA_TYPE" \

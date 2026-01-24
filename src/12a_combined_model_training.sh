@@ -121,7 +121,7 @@ if [ "$USE_CPU" = "true" ]; then
 fi
 
 # Run training
-python scripts/02a_model_training.py "${TRAIN_ARGS[@]}"
+python ../scripts/02a_model_training.py "${TRAIN_ARGS[@]}"
 
 echo ""
 echo "=========================================="

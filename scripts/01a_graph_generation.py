@@ -170,6 +170,78 @@ def voronoi_finite_polygons_2d(vor: Voronoi, radius: Optional[float] = None):
 
 
 # =============================================================================
+#  Node Reordering Functions
+# =============================================================================
+
+def reorder_nodes_bfs(nodes: np.ndarray, edges: List[Tuple[int, int]], start_node: int = 0) -> Tuple[np.ndarray, List[Tuple[int, int]], np.ndarray]:
+    """
+    Reorder nodes using BFS traversal starting from a specified node.
+    
+    Args:
+        nodes: Array of node coordinates (N, 2)
+        edges: List of edge tuples (u, v)
+        start_node: Starting node index for BFS (default: 0, first boundary point)
+    
+    Returns:
+        reordered_nodes: Nodes reordered by BFS traversal
+        reordered_edges: Edges remapped to new node IDs
+        old_to_new: Mapping from old node ID to new node ID
+    """
+    num_nodes = len(nodes)
+    
+    # Build adjacency list
+    adj_list = [[] for _ in range(num_nodes)]
+    for u, v in edges:
+        adj_list[u].append(v)
+        adj_list[v].append(u)
+    
+    # BFS traversal
+    visited = [False] * num_nodes
+    queue = [start_node]
+    visited[start_node] = True
+    bfs_order = [start_node]
+    
+    while queue:
+        current = queue.pop(0)
+        # Sort neighbors for deterministic ordering
+        neighbors = sorted(adj_list[current])
+        for neighbor in neighbors:
+            if not visited[neighbor]:
+                visited[neighbor] = True
+                queue.append(neighbor)
+                bfs_order.append(neighbor)
+    
+    # Handle disconnected components (if any)
+    for i in range(num_nodes):
+        if not visited[i]:
+            bfs_order.append(i)
+    
+    # Create mapping from old ID to new ID
+    old_to_new = np.zeros(num_nodes, dtype=int)
+    for new_id, old_id in enumerate(bfs_order):
+        old_to_new[old_id] = new_id
+    
+    # Reorder nodes
+    reordered_nodes = nodes[bfs_order]
+    
+    # Remap edges
+    reordered_edges = []
+    for u, v in edges:
+        new_u = old_to_new[u]
+        new_v = old_to_new[v]
+        if new_u != new_v:  # Skip self-loops
+            # Ensure u < v for consistency
+            if new_u > new_v:
+                new_u, new_v = new_v, new_u
+            reordered_edges.append((new_u, new_v))
+    
+    # Remove duplicate edges
+    reordered_edges = list(set(reordered_edges))
+    
+    return reordered_nodes, reordered_edges, old_to_new
+
+
+# =============================================================================
 #  Dataset Saving Functions
 # =============================================================================
 
@@ -714,6 +786,8 @@ def parse_args():
     p.add_argument("--no_adaptive_step", action="store_true", help="Disable adaptive step")
     p.add_argument("--topology", type=str, default=None, 
                     help="Gluing rule string: use capital letters for reversed edges (A=a^-1, B=b^-1, etc.). Example: 'abAB' for torus")
+    p.add_argument("--prefix", type=str, default=None,
+                    help="Topology prefix for dataset naming (e.g., 'torus', 'klein', 'sphere'). If not provided, will be auto-detected from topology rule.")
     p.add_argument("--output_dir", type=str, default="output", help="Output directory")
     return p.parse_args()
 
@@ -750,7 +824,26 @@ def main():
     if args.topology:
         print(f"\n[Topology] Processing Gluing Rule: {args.topology}")
         try:
+            # Count edges in topology rule
+            topology_edges = len(re.findall(r"([a-zA-Z])", args.topology))
             num_poly_edges = 2 * args.n
+            
+            # Validate that polygon has correct number of edges
+            if topology_edges != num_poly_edges:
+                required_n = topology_edges // 2
+                if topology_edges % 2 != 0:
+                    raise ValueError(
+                        f"[Error] Topology rule '{args.topology}' has {topology_edges} edges, "
+                        f"which is not even. A 2n-polygon must have an even number of edges.\n"
+                        f"  Please check your topology rule."
+                    )
+                raise ValueError(
+                    f"[Error] Topology rule '{args.topology}' requires {topology_edges} edges, "
+                    f"but polygon with n={args.n} has {num_poly_edges} edges (2n={2*args.n}).\n"
+                    f"  Solution: Set n={required_n} to get {topology_edges} edges (2n={2*required_n}).\n"
+                    f"  Example: For double torus (abABcdCD), use n=4."
+                )
+            
             gluing_rules = parse_topology_string(args.topology, num_poly_edges)
             nodes_raw, edges_raw = glue_boundary_edges(x_final, polygon, gluing_rules, args.K_edge)
             final_nodes, final_edges = nodes_raw, edges_raw
@@ -760,9 +853,32 @@ def main():
             print(f"  - Glued Nodes: {len(final_nodes)}")
             print(f"  - Edges: {len(final_edges)}")
             
-            # Construct dataset name
+            # Reorder nodes using BFS starting from first boundary point (node 0)
+            print(f"\n[Reordering] Applying BFS traversal to assign node IDs...")
+            final_nodes, final_edges, old_to_new = reorder_nodes_bfs(final_nodes, final_edges, start_node=0)
+            print(f"  - Reordered {len(final_nodes)} nodes using BFS from node 0")
+            print(f"  - Remapped {len(final_edges)} edges")
+            
+            # Construct dataset name with prefix
             # Topology rule should already be in capital letter form (e.g., abAB instead of aba^-1b^-1)
-            dataset_name = f"{args.topology}_n{args.n}_k{args.K_edge}_iter{args.iters}"
+            if args.prefix:
+                prefix = args.prefix
+            else:
+                # Auto-detect prefix based on topology rule (matching shell script logic)
+                topology_rule = args.topology
+                if topology_rule in ["abAB", "abABcdCD", "abABcdCDefEF"]:
+                    prefix = "torus"
+                elif topology_rule in ["abAb", "abaB"]:
+                    prefix = "klein"
+                elif topology_rule in ["abBA", "aAbB"]:
+                    prefix = "sphere"
+                elif topology_rule == "abab":
+                    prefix = "projective"
+                else:
+                    # Default: use first 8 chars of topology rule (lowercase)
+                    prefix = topology_rule.lower()[:8]
+            
+            dataset_name = f"{prefix}_{args.topology}_n{args.n}_k{args.K_edge}_iter{args.iters}"
             
             save_dataset(final_nodes, final_edges, args, dataset_name=dataset_name, output_dir=args.output_dir)
         except Exception as e:

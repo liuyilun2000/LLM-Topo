@@ -111,7 +111,7 @@ fi
 echo ""
 
 # Python script path
-PYTHON_SCRIPT="${SCRIPT_DIR}/05b_visualize_persistence_3d.py"
+PYTHON_SCRIPT="${SCRIPT_DIR}/../scripts/05b_visualize_persistence_3d.py"
 
 # Build Python command
 PYTHON_CMD="python3 ${PYTHON_SCRIPT} --work-dir ${WORK_DIR}"

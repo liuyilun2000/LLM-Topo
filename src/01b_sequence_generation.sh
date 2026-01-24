@@ -15,11 +15,8 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Local configuration - must match graph generation parameters
-N=${N:-2}                    # n in 2n-polygon (must match 01a)
-K_EDGE=${K_EDGE:-25}         # Points per edge (must match 01a)
-ITERS=${ITERS:-200}          # Relaxation iterations (must match 01a)
-TOPOLOGY_RULE=${TOPOLOGY_RULE:-"abAB"}  # Topology gluing rule: capital letters for reversed edges (A=a^-1, B=b^-1, etc.), must match 01a
+# Variables N, K_EDGE, ITERS, TOPOLOGY_RULE are loaded from 00_config_env.sh
+# They must match the values used in 01a_graph_generation.sh
 
 # Walk generation parameters
 MAX_LENGTH=${MAX_LENGTH:-128}
@@ -30,18 +27,18 @@ RESTART_PROB=${RESTART_PROB:-0}
 TEMPERATURE=${TEMPERATURE:-1}
 SEED=${SEED:-42}
 
-# Output paths
-SEQUENCE_DIR="${SEQUENCE_DIR:-./${DATA_DIR}/sequences}"
+# Variables SEQUENCE_DIR, DATA_DIR are loaded from 00_config_env.sh
 mkdir -p "${SEQUENCE_DIR}"
 
 # Construct dataset name (must match what 01a_graph_generation.py produces)
-# Use topology rule directly (already in capital letter form)
-DATASET_NAME_PYTHON="${TOPOLOGY_RULE}_n${N}_k${K_EDGE}_iter${ITERS}"
+# Use prefix + topology rule: {PREFIX}_{TOPOLOGY_RULE}_n{N}_k{K_EDGE}_iter{ITERS}
+DATASET_NAME_PYTHON="${TOPOLOGY_PREFIX}_${TOPOLOGY_RULE}_n${N}_k${K_EDGE}_iter${ITERS}"
 OUT=${OUT:-${SEQUENCE_DIR}/walks_${DATASET_NAME_PYTHON}.csv}
 COUNTS_OUT=${COUNTS_OUT:-${SEQUENCE_DIR}/visit_counts_${DATASET_NAME_PYTHON}.csv}
 
 echo ""
 echo "Configuration:"
+echo "  Topology prefix: ${TOPOLOGY_PREFIX}"
 echo "  Topology rule: ${TOPOLOGY_RULE}"
 echo "  Polygon n: ${N}"
 echo "  K_edge: ${K_EDGE}"
@@ -69,9 +66,10 @@ if [ ! -f "$GRAPH_BASE" ]; then
 fi
 
 echo "Generating random walks..."
-python scripts/01b_sequence_generation.py \
+python ../scripts/01b_sequence_generation.py \
     --graph_dir "${GRAPH_DIR}" \
     --topology "${TOPOLOGY_RULE}" \
+    --prefix "${TOPOLOGY_PREFIX}" \
     --n ${N} \
     --K_edge ${K_EDGE} \
     --iters ${ITERS} \

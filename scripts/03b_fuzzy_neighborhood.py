@@ -307,18 +307,7 @@ def compute_fuzzy_neighborhood_distance(X, n_neighbors=200, metric='euclidean',
     return dist_matrix, info
 
 
-def load_pca_results(pca_dir, key):
-    """Load PCA results"""
-    pca_dir = Path(pca_dir)
-    npz_file = pca_dir / f'{key}_pca.npz'
-    
-    if not npz_file.exists():
-        raise FileNotFoundError(f"PCA results not found for {key} in {pca_dir}")
-    
-    data = np.load(npz_file)
-    pca_reduced = data['pca_reduced']
-    
-    return pca_reduced
+from data_loading_utils import load_pca_data
 
 
 def process_representation(key, pca_dir, output_dir, n_neighbors=200,
@@ -351,7 +340,7 @@ def process_representation(key, pca_dir, output_dir, n_neighbors=200,
     
     # Load PCA data
     print("\nLoading PCA data...")
-    pca_data = load_pca_results(pca_dir, key)
+    pca_data, _ = load_pca_data(pca_dir, key, use_downsampled=False)
     print(f"  Loaded PCA data: {pca_data.shape}")
     
     # Compute fuzzy neighborhood distance

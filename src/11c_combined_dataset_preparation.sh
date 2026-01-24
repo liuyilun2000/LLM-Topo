@@ -32,8 +32,8 @@ MAX_TARGET_SAMPLES=${MAX_TARGET_SAMPLES:-""}
 
 # Source dataset (from previous steps)
 # Construct dataset name to match sequence generation output
-# Use topology rule directly (already in capital letter form)
-DATASET_NAME_PYTHON="${TOPOLOGY_RULE}_n${N}_k${K_EDGE}_iter${ITERS}"
+# Use prefix + topology rule: {PREFIX}_{TOPOLOGY_RULE}_n{N}_k{K_EDGE}_iter{ITERS}
+DATASET_NAME_PYTHON="${TOPOLOGY_PREFIX}_${TOPOLOGY_RULE}_n${N}_k${K_EDGE}_iter${ITERS}"
 SOURCE_CSV=${SOURCE_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME_PYTHON}.csv}
 
 # Output directory
@@ -87,7 +87,7 @@ if [ ! -f "$SOURCE_CSV" ]; then
 fi
 
 # Build command
-CMD="python scripts/11c_combined_dataset_preparation.py \
+CMD="python ../scripts/11c_combined_dataset_preparation.py \
     --target_dataset_name \"${TARGET_DATASET_NAME}\" \
     --target_dataset_split \"${TARGET_DATASET_SPLIT}\" \
     --target_dataset_text_field \"${TARGET_DATASET_TEXT_FIELD}\" \

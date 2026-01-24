@@ -14,8 +14,13 @@
 
 # Manifold Geometry dimensions
 # Polygon-based parameters for repulsive force point distribution
-export N=${N:-2}                    # n in 2n-polygon (2=Square, 3=Hexagon, etc.)
-export K_EDGE=${K_EDGE:-25}         # Points per edge (density)
+# IMPORTANT: n determines the number of edges: 2n edges total
+#   - n=2 → 4 edges (square) → suitable for: abAB (torus), abAb (klein), abBA (sphere), abab (projective)
+#   - n=4 → 8 edges (octagon) → suitable for: abABcdCD (double torus)
+#   - n=3 → 6 edges (hexagon) → suitable for custom topologies
+# Make sure n matches your topology rule: topology rule length = 2n
+export N=${N:-4}                    # n in 2n-polygon (2=Square, 3=Hexagon, 4=Octagon, etc.)
+export K_EDGE=${K_EDGE:-15}         # Points per edge (density)
 export ITERS=${ITERS:-200}          # Relaxation iterations
 
 # Topology configuration
@@ -25,21 +30,25 @@ export ITERS=${ITERS:-200}          # Relaxation iterations
 #   - Uppercase letters (A, B, C, ...) = reversed edges (mathematical notation: a^-1, b^-1, c^-1, ...)
 #   
 #   Examples (input the capital letter form directly):
-#   - Torus (Standard)        : aba^-1b^-1  →  abAB
-#   - Klein Bottle            : abab^-1      →  abAb
-#   - Sphere                  : abb^-1a^-1   →  abBA
-#   - Double torus            : aba^-1b^-1cdc^-1d^-1  →  abABcdCD
-#   - Torus with 1 cross-cap   : aba^-1cdc^-1b^-1      →  abAcB
+#   - Sphere                        : abb^-1a^-1   →  abBA
+#   - Sphere (alternative)          : aa^-1bb^-1   →  aAbB
+#   - Torus                         : aba^-1b^-1   →  abAB
+#   - Double torus                  : aba^-1b^-1cdc^-1d^-1  →  abABcdCD
+#   - Projective plane              : abab         →  abab
+#   - Klein Bottle                  : aba^-1b      →  abAb
+#   - Klein Bottle (alternative)    : abab^-1      →  abaB
 #   - custom                  : Any valid gluing string matching 2*N edges
-export TOPOLOGY_RULE=${TOPOLOGY_RULE:-"abAB"}
+export TOPOLOGY_RULE=${TOPOLOGY_RULE:-"abABcdCD"}
+
+export TOPOLOGY_PREFIX="torus"
 
 # Use topology rule directly as directory name (no conversion needed)
 export TOPOLOGY_DIR="$TOPOLOGY_RULE"
 
-# Derived configuration - always recomputed from N, K_EDGE, ITERS, TOPOLOGY_RULE
-# DATASET_NAME is automatically generated from topology rule and parameters
-if [ -n "${N}" ] && [ -n "${K_EDGE}" ] && [ -n "${ITERS}" ] && [ -n "${TOPOLOGY_DIR}" ]; then
-    export DATASET_NAME="${TOPOLOGY_DIR}_n${N}_k${K_EDGE}_iter${ITERS}"
+# Derived configuration - always recomputed from N, K_EDGE, ITERS, TOPOLOGY_RULE, TOPOLOGY_PREFIX
+# DATASET_NAME is automatically generated with prefix: {PREFIX}_{TOPOLOGY_RULE}_n{N}_k{K_EDGE}_iter{ITERS}
+if [ -n "${N}" ] && [ -n "${K_EDGE}" ] && [ -n "${ITERS}" ] && [ -n "${TOPOLOGY_DIR}" ] && [ -n "${TOPOLOGY_PREFIX}" ]; then
+    export DATASET_NAME="${TOPOLOGY_PREFIX}_${TOPOLOGY_DIR}_n${N}_k${K_EDGE}_iter${ITERS}"
 fi
 
 # Run configuration (can be overridden)

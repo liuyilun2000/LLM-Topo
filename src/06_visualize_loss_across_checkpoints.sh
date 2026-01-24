@@ -59,7 +59,7 @@ fi
 echo ""
 
 # Python script path
-PYTHON_SCRIPT="${SCRIPT_DIR}/06_visualize_loss_across_checkpoints.py"
+PYTHON_SCRIPT="${SCRIPT_DIR}/../scripts/06_visualize_loss_across_checkpoints.py"
 
 # Build Python command
 PYTHON_CMD="python3 ${PYTHON_SCRIPT} --work-dir ${WORK_DIR}"

@@ -56,7 +56,7 @@ if [ -f "$REPRESENTATION_DIR/token_representations.npz" ]; then
 fi
 
 echo "Extracting token representations..."
-python scripts/02b_representation_extraction.py \
+python ../scripts/02b_representation_extraction.py \
     --model_dir "$MODEL_DIR" \
     --output_dir "$REPRESENTATION_DIR" \
     --representations $REPRESENTATIONS

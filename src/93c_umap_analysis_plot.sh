@@ -28,8 +28,8 @@ MODEL_DIR="${MODEL_DIR:-./${WORK_DIR}/final_model}"
 FUZZY_DIR="${FUZZY_DIR:-${MODEL_DIR}/fuzzy_neighborhood}"
 
 # Walks CSV file - construct dataset name to match sequence generation output
-# Use topology rule directly (already in capital letter form)
-DATASET_NAME_PYTHON="${TOPOLOGY_RULE}_n${N}_k${K_EDGE}_iter${ITERS}"
+# Use prefix + topology rule: {PREFIX}_{TOPOLOGY_RULE}_n{N}_k{K_EDGE}_iter{ITERS}
+DATASET_NAME_PYTHON="${TOPOLOGY_PREFIX}_${TOPOLOGY_RULE}_n${N}_k${K_EDGE}_iter${ITERS}"
 WALKS_CSV="${WALKS_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME_PYTHON}.csv}"
 
 # Representation key (e.g., "layer_1_after_block", "input_embeds", etc.)
@@ -95,7 +95,7 @@ echo "Generating visualization..."
 
 # Build and run Python script
 if [ -n "$WALK_ID" ]; then
-    python scripts/93c_umap_analysis_plot.py \
+    python ../scripts/93c_umap_analysis_plot.py \
         --fuzzy_dir "$FUZZY_DIR" \
         --key "$KEY" \
         --walks_csv "$WALKS_CSV" \
@@ -107,7 +107,7 @@ if [ -n "$WALK_ID" ]; then
         $(if [ -n "$UMAP_RANDOM_STATE" ]; then echo "--umap_random_state $UMAP_RANDOM_STATE"; fi) \
         --max_length "$MAX_LENGTH"
 else
-    python scripts/93c_umap_analysis_plot.py \
+    python ../scripts/93c_umap_analysis_plot.py \
         --fuzzy_dir "$FUZZY_DIR" \
         --key "$KEY" \
         --walks_csv "$WALKS_CSV" \

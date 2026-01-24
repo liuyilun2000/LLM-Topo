@@ -48,7 +48,7 @@ if [ ! -f "$REPRESENTATION_DIR/token_representations.npz" ]; then
 fi
 
 echo "Running PCA analysis..."
-python scripts/03a_pca_analysis.py \
+python ../scripts/03a_pca_analysis.py \
     --representation_dir "$REPRESENTATION_DIR" \
     --output_dir "$PCA_DIR" \
     $PCA_OPTION

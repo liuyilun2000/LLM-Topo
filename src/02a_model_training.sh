@@ -58,7 +58,7 @@ fi
 echo "Training model..."
 
 if [ "$USE_CPU" = "true" ]; then
-    python scripts/02a_model_training.py \
+    python ../scripts/02a_model_training.py \
         --dataset_dir "$DATASET_DIR" \
         --config "$CONFIG" \
         --output_dir "$OUTPUT_DIR" \
@@ -74,7 +74,7 @@ if [ "$USE_CPU" = "true" ]; then
         --save_total_limit "$SAVE_TOTAL_LIMIT" \
         --no_cuda
 else
-    python scripts/02a_model_training.py \
+    python ../scripts/02a_model_training.py \
         --dataset_dir "$DATASET_DIR" \
         --config "$CONFIG" \
         --output_dir "$OUTPUT_DIR" \

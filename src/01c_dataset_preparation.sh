@@ -17,8 +17,8 @@ source "${SCRIPT_DIR}/00_config_env.sh"
 
 # Local configuration
 # Construct dataset name to match sequence generation output
-# Use topology rule directly (already in capital letter form)
-DATASET_NAME_PYTHON="${TOPOLOGY_RULE}_n${N}_k${K_EDGE}_iter${ITERS}"
+# Use prefix + topology rule: {PREFIX}_{TOPOLOGY_RULE}_n{N}_k{K_EDGE}_iter{ITERS}
+DATASET_NAME_PYTHON="${TOPOLOGY_PREFIX}_${TOPOLOGY_RULE}_n${N}_k${K_EDGE}_iter${ITERS}"
 INPUT_CSV=${INPUT_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME_PYTHON}.csv}
 TRAIN_SPLIT=${TRAIN_SPLIT:-0.95}
 
@@ -37,7 +37,7 @@ if [ ! -f "$INPUT_CSV" ]; then
 fi
 
 echo "Preparing dataset..."
-python scripts/01c_dataset_preparation.py \
+python ../scripts/01c_dataset_preparation.py \
     --input_csv "$INPUT_CSV" \
     --output_dir "$DATASET_DIR" \
     --train_split "$TRAIN_SPLIT"

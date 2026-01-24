@@ -16,18 +16,12 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Local configuration - polygon-based parameters
-# These can be overridden via environment variables
-N=${N:-2}                    # n in 2n-polygon
-K_EDGE=${K_EDGE:-25}         # Points per edge
-ITERS=${ITERS:-200}          # Relaxation iterations
-
-# Topology gluing rule: use capital letters for reversed edges (A=a^-1, B=b^-1, etc.)
-# Examples: "abAB" for torus, "abAb" for Klein bottle
-TOPOLOGY_RULE=${TOPOLOGY_RULE:-"abAB"}
+# Variables N, K_EDGE, ITERS, TOPOLOGY_RULE are loaded from 00_config_env.sh
+# They can be overridden via environment variables before running this script
 
 echo ""
 echo "Configuration:"
+echo "  Topology prefix: ${TOPOLOGY_PREFIX}"
 echo "  Topology rule: ${TOPOLOGY_RULE}"
 echo "  Polygon n: ${N}"
 echo "  K_edge: ${K_EDGE}"
@@ -40,11 +34,12 @@ echo ""
 # Note: The Python script will handle the actual dataset name construction
 # This is just for display purposes
 echo "Generating graph representation..."
-python scripts/01a_graph_generation.py \
+python ../scripts/01a_graph_generation.py \
     --n ${N} \
     --K_edge ${K_EDGE} \
     --iters ${ITERS} \
     --topology "${TOPOLOGY_RULE}" \
+    --prefix "${TOPOLOGY_PREFIX}" \
     --output_dir "${GRAPH_DIR}"
 
 echo ""

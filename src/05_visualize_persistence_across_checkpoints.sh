@@ -149,7 +149,7 @@ fi
 echo ""
 
 # Python script path
-PYTHON_SCRIPT="${SCRIPT_DIR}/05_visualize_persistence_across_checkpoints.py"
+PYTHON_SCRIPT="${SCRIPT_DIR}/../scripts/05_visualize_persistence_across_checkpoints.py"
 
 # Process each representation
 TOTAL=${#REPRESENTATIONS[@]}
