@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Visualize UMAP embedding from fuzzy neighborhood distance matrix with trajectory overlay
+# Visualize UMAP embedding directly from dataset neighboring matrix with trajectory overlay
 #
 # This script:
-# 1. Loads a fuzzy neighborhood distance matrix
+# 1. Loads a neighboring matrix (adjacency or distance matrix) from the graph directory
 # 2. Applies UMAP to get 3D embeddings
 # 3. Loads a specified trajectory from walks CSV
 # 4. Creates a 3D visualization with:
@@ -14,30 +14,27 @@
 set -e
 
 echo "=========================================="
-echo "UMAP Visualization with Trajectory"
+echo "UMAP Visualization from Dataset Matrix with Trajectory"
 echo "=========================================="
 
 # Load shared configuration
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Local configuration
-MODEL_DIR="${MODEL_DIR:-./${WORK_DIR}/final_model}"
-
-# Fuzzy neighborhood directory
-FUZZY_DIR="${FUZZY_DIR:-${MODEL_DIR}/fuzzy_neighborhood}"
+# Graph directory (contains adjacency/distance matrices)
+GRAPH_DIR="${GRAPH_DIR:-./${DATA_DIR}/graph}"
 
 # Walks CSV file - construct dataset name to match sequence generation output
 # Use topology rule directly (already in capital letter form)
 DATASET_NAME_PYTHON="${TOPOLOGY_RULE}_n${N}_k${K_EDGE}_iter${ITERS}"
 WALKS_CSV="${WALKS_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME_PYTHON}.csv}"
 
-# Representation key (e.g., "layer_1_after_block", "input_embeds", etc.)
-KEY="${KEY:-layer_5_hidden}"
+# Matrix type: "adjacency" or "distance" (default: distance if available, else adjacency)
+MATRIX_TYPE="${MATRIX_TYPE:-auto}"
 
 # Trajectory selection
 WALK_ID="${WALK_ID:-}"  # If set, uses this walk_id
-TRAJECTORY_IDX="${TRAJECTORY_IDX:-256}"  # If WALK_ID not set, uses this index
+TRAJECTORY_IDX="${TRAJECTORY_IDX:-128}"  # If WALK_ID not set, uses this index
 
 # UMAP parameters
 UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-3}"
@@ -49,12 +46,13 @@ UMAP_RANDOM_STATE="${UMAP_RANDOM_STATE:-100}"  # Set to integer for reproducibil
 MAX_LENGTH="${MAX_LENGTH:-128}"  # Maximum number of points to plot in trajectory
 
 # Output directory
-OUTPUT_DIR="${OUTPUT_DIR:-${MODEL_DIR}/umap_plot}"
+OUTPUT_DIR="${OUTPUT_DIR:-./${DATA_DIR}/umap_dataset_plot}"
 
 echo ""
 echo "Configuration:"
-echo "  Fuzzy dir: $FUZZY_DIR"
-echo "  Key: $KEY"
+echo "  Graph dir: $GRAPH_DIR"
+echo "  Dataset: $DATASET_NAME_PYTHON"
+echo "  Matrix type: $MATRIX_TYPE"
 echo "  Walks CSV: $WALKS_CSV"
 if [ -n "$WALK_ID" ]; then
     echo "  Walk ID: $WALK_ID"
@@ -73,11 +71,48 @@ fi
 echo "  Max trajectory length: $MAX_LENGTH points"
 echo ""
 
-# Check if fuzzy distance matrix exists
-FUZZY_FILE="${FUZZY_DIR}/${KEY}_fuzzy_dist.npz"
-if [ ! -f "$FUZZY_FILE" ]; then
-    echo "Error: Fuzzy distance matrix not found: $FUZZY_FILE"
-    echo "Please run ./03b_fuzzy_neighborhood.sh first"
+# Check if graph directory exists
+if [ ! -d "$GRAPH_DIR" ]; then
+    echo "Error: Graph directory not found: $GRAPH_DIR"
+    echo "Please run ./01a_graph_generation.sh first"
+    exit 1
+fi
+
+# Check for distance matrix first (preferred), then adjacency matrix
+DISTANCE_FILE="${GRAPH_DIR}/distance_matrix_${DATASET_NAME_PYTHON}.npy"
+ADJACENCY_FILE="${GRAPH_DIR}/A_${DATASET_NAME_PYTHON}.npy"
+
+if [ "$MATRIX_TYPE" = "auto" ]; then
+    if [ -f "$DISTANCE_FILE" ]; then
+        MATRIX_FILE="$DISTANCE_FILE"
+        MATRIX_TYPE="distance"
+        echo "Found distance matrix: $DISTANCE_FILE"
+    elif [ -f "$ADJACENCY_FILE" ]; then
+        MATRIX_FILE="$ADJACENCY_FILE"
+        MATRIX_TYPE="adjacency"
+        echo "Found adjacency matrix: $ADJACENCY_FILE"
+    else
+        echo "Error: Neither distance matrix nor adjacency matrix found"
+        echo "  Expected: $DISTANCE_FILE"
+        echo "  Or: $ADJACENCY_FILE"
+        exit 1
+    fi
+elif [ "$MATRIX_TYPE" = "distance" ]; then
+    MATRIX_FILE="$DISTANCE_FILE"
+    if [ ! -f "$MATRIX_FILE" ]; then
+        echo "Error: Distance matrix not found: $MATRIX_FILE"
+        exit 1
+    fi
+    echo "Using distance matrix: $MATRIX_FILE"
+elif [ "$MATRIX_TYPE" = "adjacency" ]; then
+    MATRIX_FILE="$ADJACENCY_FILE"
+    if [ ! -f "$MATRIX_FILE" ]; then
+        echo "Error: Adjacency matrix not found: $MATRIX_FILE"
+        exit 1
+    fi
+    echo "Using adjacency matrix: $MATRIX_FILE"
+else
+    echo "Error: Invalid MATRIX_TYPE: $MATRIX_TYPE (must be 'auto', 'distance', or 'adjacency')"
     exit 1
 fi
 
@@ -88,16 +123,16 @@ if [ ! -f "$WALKS_CSV" ]; then
     exit 1
 fi
 
-echo "Found fuzzy distance matrix: $FUZZY_FILE"
 echo "Found walks CSV: $WALKS_CSV"
 echo ""
 echo "Generating visualization..."
 
 # Build and run Python script
 if [ -n "$WALK_ID" ]; then
-    python scripts/93c_umap_analysis_plot.py \
-        --fuzzy_dir "$FUZZY_DIR" \
-        --key "$KEY" \
+    python scripts/93d_umap_dataset_plot.py \
+        --graph_dir "$GRAPH_DIR" \
+        --dataset_name "$DATASET_NAME_PYTHON" \
+        --matrix_type "$MATRIX_TYPE" \
         --walks_csv "$WALKS_CSV" \
         --walk_id "$WALK_ID" \
         --output_dir "$OUTPUT_DIR" \
@@ -107,9 +142,10 @@ if [ -n "$WALK_ID" ]; then
         $(if [ -n "$UMAP_RANDOM_STATE" ]; then echo "--umap_random_state $UMAP_RANDOM_STATE"; fi) \
         --max_length "$MAX_LENGTH"
 else
-    python scripts/93c_umap_analysis_plot.py \
-        --fuzzy_dir "$FUZZY_DIR" \
-        --key "$KEY" \
+    python scripts/93d_umap_dataset_plot.py \
+        --graph_dir "$GRAPH_DIR" \
+        --dataset_name "$DATASET_NAME_PYTHON" \
+        --matrix_type "$MATRIX_TYPE" \
         --walks_csv "$WALKS_CSV" \
         --trajectory_idx "$TRAJECTORY_IDX" \
         --output_dir "$OUTPUT_DIR" \

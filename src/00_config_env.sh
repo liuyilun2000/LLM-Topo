@@ -6,37 +6,40 @@
 # Source this file in each script: source 00_config_env.sh
 #
 # This file provides centralized configuration for:
-#   - Grid dimensions (H, W)
-#   - Topology type
+#   - Manifold Geometry (N, K_EDGE, ITERS)
+#   - Topology Gluing Rule
 #   - Dataset naming
 #   - Run naming
 # ============================================================================
 
-# Grid dimensions
-export H=${H:-30}
-export W=${W:-40}
+# Manifold Geometry dimensions
+# Polygon-based parameters for repulsive force point distribution
+export N=${N:-2}                    # n in 2n-polygon (2=Square, 3=Hexagon, etc.)
+export K_EDGE=${K_EDGE:-25}         # Points per edge (density)
+export ITERS=${ITERS:-200}          # Relaxation iterations
 
 # Topology configuration
-# Available topology types:
-#   - plane          : Plane (flat, no wrapping) (H=height/Y, W=width/X)
-#   - cylinder_x     : Cylinder wrapping in x-direction (H=height/Z-axis, W=circumference/angle)
-#   - cylinder_y     : Cylinder wrapping in y-direction (H=circumference/angle, W=height/Z-axis)
-#   - mobius_x       : Möbius strip wrapping in x-direction (H=width/across-strip, W=circumference/main-loop)
-#   - mobius_y       : Möbius strip wrapping in y-direction (H=circumference/main-loop, W=width/across-strip)
-#   - torus          : Torus (both directions wrap) (H=poloidal/tube-circumference, W=toroidal/major-radius)
-#   - klein_x        : Klein bottle wrapping in x-direction (H=U-direction, W=V-direction) (H=toroidal/major-loop, W=poloidal/tube-with-twist)
-#   - klein_y        : Klein bottle wrapping in y-direction (H=V-direction, W=U-direction) (H=poloidal/tube-with-twist, W=toroidal/major-loop)
-#   - proj_plane     : Projective plane (H=U-parameter, W=V-parameter)
-#   - sphere_two     : Sphere with two hemispheres (A and B layers, reverse boundary gluing) (H=square-grid-Y, W=square-grid-X)
-#   - hemisphere_n   : Northern hemisphere (open boundary) (H=latitude/radial-to-pole, W=longitude/azimuthal)
-#   - hemisphere_s   : Southern hemisphere (open boundary) (H=latitude/radial-to-pole, W=longitude/azimuthal)
-#   - sphere         : Sphere (single point S, all boundaries connect to S) (H≈latitude, W≈longitude, interior points only)
-export TOPOLOGY=${TOPOLOGY:-"torus"}
+# Topology rule string (Gluing Rules):
+#   IMPORTANT: Input format uses capital letters for reversed edges.
+#   - Lowercase letters (a, b, c, ...) = normal edges
+#   - Uppercase letters (A, B, C, ...) = reversed edges (mathematical notation: a^-1, b^-1, c^-1, ...)
+#   
+#   Examples (input the capital letter form directly):
+#   - Torus (Standard)        : aba^-1b^-1  →  abAB
+#   - Klein Bottle            : abab^-1      →  abAb
+#   - Sphere                  : abb^-1a^-1   →  abBA
+#   - Double torus            : aba^-1b^-1cdc^-1d^-1  →  abABcdCD
+#   - Torus with 1 cross-cap   : aba^-1cdc^-1b^-1      →  abAcB
+#   - custom                  : Any valid gluing string matching 2*N edges
+export TOPOLOGY_RULE=${TOPOLOGY_RULE:-"abAB"}
 
-# Derived configuration - always recomputed from H, W, TOPOLOGY
-# DATASET_NAME is automatically generated from topology and dimensions
-if [ -n "${H}" ] && [ -n "${W}" ] && [ -n "${TOPOLOGY}" ]; then
-    export DATASET_NAME="${TOPOLOGY}_${H}x${W}"
+# Use topology rule directly as directory name (no conversion needed)
+export TOPOLOGY_DIR="$TOPOLOGY_RULE"
+
+# Derived configuration - always recomputed from N, K_EDGE, ITERS, TOPOLOGY_RULE
+# DATASET_NAME is automatically generated from topology rule and parameters
+if [ -n "${N}" ] && [ -n "${K_EDGE}" ] && [ -n "${ITERS}" ] && [ -n "${TOPOLOGY_DIR}" ]; then
+    export DATASET_NAME="${TOPOLOGY_DIR}_n${N}_k${K_EDGE}_iter${ITERS}"
 fi
 
 # Run configuration (can be overridden)
@@ -52,7 +55,7 @@ export COMBINED_DATASET_DIR="${COMBINED_DATASET_DIR:-${DATA_DIR}/combined_datase
 
 # Graph generation parameters
 export GRAPH_DIR="${GRAPH_DIR:-./${DATA_DIR}/graph}"
-export NEIGH=${NEIGH:-8}
+export SEQUENCE_DIR="${SEQUENCE_DIR:-./${DATA_DIR}/sequences}"
 
 
 #export MODEL_DIR="${MODEL_DIR:-${WORK_DIR}/final_model}" # or checkpoints directory

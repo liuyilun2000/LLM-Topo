@@ -6,33 +6,32 @@
 This script generates random walk sequences on a pre-computed graph structure.
 The graph representation should be generated first using 01a_graph_generation.py.
 
-Input files (from 01a_graph_generation.py):
-  - A_{topology}_{H}x{W}_labeled.csv : Adjacency matrix with node labels
-  - nodes_{topology}_{H}x{W}.csv : Node information
-  - coords_{topology}_{H}x{W}.csv : Coordinates (optional, for visualization)
+Input files (from output folder):
+  - A_{dataset_name}_labeled.csv : Adjacency matrix with node labels
+  - nodes_{dataset_name}.csv : Node information
+  - coords_{dataset_name}.csv : Coordinates (optional, for visualization)
 
 Output files:
-  - walks_{topology}_{H}x{W}.csv : Random walk sequences
-  - visit_counts_{topology}_{H}x{W}.csv : Node visit statistics
+  - walks_{dataset_name}.csv : Random walk sequences
+  - visit_counts_{dataset_name}.csv : Node visit statistics
 """
 
 import argparse
 import csv
 import os
+import re
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
 
-def load_graph(graph_dir: str, topology: str, H: int, W: int):
+def load_graph(graph_dir: str, dataset_name: str):
     """
-    Load graph representation from saved files.
+    Load graph representation from saved files using dataset_name.
     
     Args:
-        graph_dir: Directory containing graph files
-        topology: Topology name
-        H: Grid height
-        W: Grid width
+        graph_dir: Directory containing graph files (e.g., "./output")
+        dataset_name: Name of the dataset (e.g., "aba^-1b^-1_n2_k25_iter200")
         
     Returns:
         A: Adjacency matrix (N x N)
@@ -40,32 +39,37 @@ def load_graph(graph_dir: str, topology: str, H: int, W: int):
         nodes_df: Node information DataFrame
         coords: Coordinates (N x 3) or None
     """
-    base = f"{topology}_{H}x{W}"
     
-    # Load adjacency matrix
-    A_labeled_path = os.path.join(graph_dir, f"A_{base}_labeled.csv")
+    # 1. Load adjacency matrix (A_{dataset_name}_labeled.csv)
+    A_labeled_path = os.path.join(graph_dir, f"A_{dataset_name}_labeled.csv")
     if not os.path.exists(A_labeled_path):
         raise FileNotFoundError(f"Graph file not found: {A_labeled_path}\n"
-                               f"Please run 01a_graph_generation.py first to create the graph representation.")
+                               f"Please make sure you run the generation script first with matching parameters.")
     
+    print(f"Loading adjacency matrix from: {A_labeled_path}")
     dfA = pd.read_csv(A_labeled_path, index_col=0)
     labels = dfA.index.astype(str).tolist()
     A = dfA.values.astype(np.int8)
     
-    # Load nodes information
-    nodes_path = os.path.join(graph_dir, f"nodes_{base}.csv")
+    # 2. Load nodes information (nodes_{dataset_name}.csv)
+    nodes_path = os.path.join(graph_dir, f"nodes_{dataset_name}.csv")
     if os.path.exists(nodes_path):
-        nodes_df = pd.read_csv(nodes_path)
+        nodes_df = pd.read_csv(nodes_path, index_col=0)
     else:
-        # Fallback: create from labels
         nodes_df = pd.DataFrame({"node_id": labels})
     
-    # Load coordinates (optional)
-    coords_path = os.path.join(graph_dir, f"coords_{base}.csv")
+    # 3. Load coordinates (coords_{dataset_name}.csv)
+    coords_path = os.path.join(graph_dir, f"coords_{dataset_name}.csv")
+    coords = None
     if os.path.exists(coords_path):
-        coords = np.loadtxt(coords_path, delimiter=",")
-    else:
-        coords = None
+        try:
+            df_coords = pd.read_csv(coords_path, index_col=0)
+            if set(['x', 'y', 'z']).issubset(df_coords.columns):
+                coords = df_coords[['x', 'y', 'z']].values
+            else:
+                print(f"[Warn] Coords file found but columns mismatch. Expected x,y,z.")
+        except Exception as e:
+            print(f"[Warn] Failed to load coords: {e}")
     
     return A, labels, nodes_df, coords
 
@@ -99,20 +103,6 @@ def random_walk_with_restart_balanced(neighbors, start_idx: int, max_len: int,
                                       no_repeat_window: int = 0):
     """
     Generate a single random walk with restart and balanced sampling.
-    
-    Args:
-        neighbors: List of neighbor arrays for each node
-        start_idx: Starting node index
-        max_len: Maximum walk length
-        restart_prob: Probability of restarting at each step
-        visits: Array of visit counts for each node
-        target: Target visit count per node
-        temp: Temperature for deficit weighting
-        rng: Random number generator
-        no_repeat_window: Avoid revisiting nodes in last N steps (0 to disable)
-        
-    Returns:
-        path: List of node indices visited
     """
     path = [start_idx]
     cur = start_idx
@@ -173,13 +163,19 @@ def main():
         description="Generate random walk sequences from saved graph representation"
     )
     
-    # Graph loading
-    ap.add_argument("--graph_dir", type=str, default="./data/graphs",
-                    help="Directory containing graph files (from 01a_graph_generation.py)")
+    # Graph loading arguments
+    ap.add_argument("--graph_dir", type=str, default="./output",
+                    help="Directory containing graph files (default: ./output)")
+    
+    # Dataset Identifier Parameters (Must match generation script)
     ap.add_argument("--topology", type=str, required=True,
-                    help="Topology name (must match graph files)")
-    ap.add_argument("--H", type=int, required=True, help="Grid height")
-    ap.add_argument("--W", type=int, required=True, help="Grid width")
+                    help="Topology rule string: use capital letters for reversed edges (A=a^-1, B=b^-1, etc.). Example: 'abAB' for torus")
+    ap.add_argument("--n", type=int, required=True,
+                    help="n in 2n-polygon (e.g., 2)")
+    ap.add_argument("--K_edge", type=int, required=True,
+                    help="Points per edge (e.g., 25)")
+    ap.add_argument("--iters", type=int, required=True,
+                    help="Relaxation iterations (e.g., 200)")
     
     # Walk generation parameters
     ap.add_argument("--max_length", type=int, default=128,
@@ -187,47 +183,51 @@ def main():
     ap.add_argument("--max_seqs", type=int, default=120000,
                     help="Maximum number of sequences")
     ap.add_argument("--min_visits_per_node", type=int, default=10000000000,
-                    help="Minimum visits per node before stopping (default: very large, effectively disabled)")
+                    help="Minimum visits per node before stopping")
     ap.add_argument("--restart_prob", type=float, default=0.0,
-                    help="Restart probability (0.0 = no restart)")
+                    help="Restart probability")
     ap.add_argument("--temperature", type=float, default=1.0,
-                    help="Temperature for deficit sampling (lower = more aggressive)")
+                    help="Temperature for deficit sampling")
     ap.add_argument("--no_repeat_window", type=int, default=32,
-                    help="Avoid revisiting nodes in last N steps (0 to disable)")
+                    help="Avoid revisiting nodes in last N steps")
     ap.add_argument("--seed", type=int, default=42, help="Random seed")
     
-    # Output
+    # Output parameters
     ap.add_argument("--out", type=str, default=None,
-                    help="Output CSV file (default: auto-generated from topology)")
+                    help="Output CSV file path")
     ap.add_argument("--counts_out", type=str, default=None,
-                    help="Visit counts output CSV (default: auto-generated)")
+                    help="Visit counts CSV path")
     ap.add_argument("--flush_every", type=int, default=2000,
                     help="Flush output file every N sequences")
     
     args = ap.parse_args()
     
+    # Construct dataset name to match generator
+    # Topology rule should already be in capital letter form (e.g., abAB instead of aba^-1b^-1)
+    dataset_name = f"{args.topology}_n{args.n}_k{args.K_edge}_iter{args.iters}"
+    
     # Auto-generate output paths if not provided
+    data_dir = "./data/sequences"
     if args.out is None:
-        args.out = f"./data/walks_{args.topology}_{args.H}x{args.W}.csv"
+        args.out = f"{data_dir}/walks_{dataset_name}.csv"
     if args.counts_out is None:
-        args.counts_out = f"./data/visit_counts_{args.topology}_{args.H}x{args.W}.csv"
+        args.counts_out = f"{data_dir}/visit_counts_{dataset_name}.csv"
     
     print("=" * 60)
-    print("Random Walk Generation")
+    print("Random Walk Generation (Manifold Adapter)")
     print("=" * 60)
     print(f"Graph directory: {args.graph_dir}")
-    print(f"Topology: {args.topology}")
-    print(f"Grid size: {args.H}x{args.W}")
-    print(f"Output: {args.out}")
-    print(f"Counts output: {args.counts_out}")
+    print(f"Target Dataset:  {dataset_name}")
+    print(f"Output Walks:    {args.out}")
+    print(f"Output Counts:   {args.counts_out}")
     print()
     
     # Load graph
     print("Loading graph representation...")
     try:
-        A, labels, nodes_df, coords = load_graph(args.graph_dir, args.topology, args.H, args.W)
+        A, labels, nodes_df, coords = load_graph(args.graph_dir, dataset_name)
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error loading graph: {e}")
         return 1
     
     N = A.shape[0]
@@ -236,6 +236,8 @@ def main():
     total_steps = 0
     
     print(f"Graph loaded: {N} nodes, {A.sum() // 2} edges")
+    if coords is not None:
+        print("Coordinates loaded successfully.")
     print()
     
     # Initialize output file
@@ -289,6 +291,9 @@ def main():
                 if visits.min() >= args.min_visits_per_node:
                     print(f"\nStopping: all nodes have at least {args.min_visits_per_node} visits")
                     break
+    
+    except KeyboardInterrupt:
+        print("\nInterrupted by user. Saving progress...")
     
     finally:
         pbar.close()

@@ -27,7 +27,10 @@ TARGET_TOKENIZER_NAME=${TARGET_TOKENIZER_NAME:-""}
 MAX_TARGET_SAMPLES=${MAX_TARGET_SAMPLES:-""}
 
 # Source dataset (from previous steps)
-SOURCE_CSV=${SOURCE_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME}.csv}
+# Construct dataset name to match sequence generation output
+# Use topology rule directly (already in capital letter form)
+DATASET_NAME_PYTHON="${TOPOLOGY_RULE}_n${N}_k${K_EDGE}_iter${ITERS}"
+SOURCE_CSV=${SOURCE_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME_PYTHON}.csv}
 
 # Output directory
 COMBINED_DATASET_DIR=${COMBINED_DATASET_DIR:-./${DATA_DIR}/combined_dataset}

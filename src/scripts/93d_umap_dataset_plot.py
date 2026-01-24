@@ -1,5 +1,5 @@
 """
-Visualize UMAP embedding from fuzzy neighborhood distance matrix with trajectory overlay
+Visualize UMAP embedding directly from dataset neighboring matrix with trajectory overlay
 Creates a 3D plot with point cloud and trajectory colored by time
 """
 import argparse
@@ -10,6 +10,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.colors import LinearSegmentedColormap
 from pathlib import Path
 import pandas as pd
+from scipy.sparse.csgraph import shortest_path
 
 # Try to import umap and plotly
 try:
@@ -30,19 +31,92 @@ except ImportError:
     print("Interactive HTML visualizations will be skipped.")
 
 
-def load_fuzzy_distance_matrix(fuzzy_dir, key):
-    """Load fuzzy neighborhood distance matrix"""
-    fuzzy_dir = Path(fuzzy_dir)
+def load_adjacency_matrix(graph_dir, dataset_name):
+    """Load adjacency matrix from graph directory"""
+    graph_dir = Path(graph_dir)
+    adjacency_file = graph_dir / f'A_{dataset_name}.npy'
     
-    npz_file = fuzzy_dir / f'{key}_fuzzy_dist.npz'
-    if not npz_file.exists():
-        raise FileNotFoundError(f"Fuzzy distance matrix not found for {key} in {fuzzy_dir}")
+    if not adjacency_file.exists():
+        return None
     
-    data = np.load(npz_file)
-    distance_matrix = data['distance_matrix']
-    pca_data = data.get('pca_reduced', None)
+    adjacency = np.load(adjacency_file)
+    # Make sure it's binary (convert to 0/1)
+    adjacency = (adjacency > 0).astype(int)
+    return adjacency
+
+
+def load_dataset_matrix(graph_dir, dataset_name, matrix_type='auto'):
+    """
+    Load neighboring matrix from graph directory
     
-    return distance_matrix, pca_data
+    Args:
+        graph_dir: path to graph directory
+        dataset_name: dataset name (e.g., "torus_30x40")
+        matrix_type: 'auto', 'distance', or 'adjacency'
+    
+    Returns:
+        distance_matrix: distance matrix for UMAP (always returns distance matrix)
+        matrix_type_used: which matrix type was actually used
+    """
+    graph_dir = Path(graph_dir)
+    
+    distance_file = graph_dir / f'distance_matrix_{dataset_name}.npy'
+    adjacency_file = graph_dir / f'A_{dataset_name}.npy'
+    
+    if matrix_type == 'auto':
+        if distance_file.exists():
+            matrix = np.load(distance_file)
+            print(f"  Loaded distance matrix from: {distance_file.name}")
+            print(f"  Shape: {matrix.shape}")
+            return matrix, 'distance'
+        elif adjacency_file.exists():
+            adjacency = np.load(adjacency_file)
+            print(f"  Loaded adjacency matrix from: {adjacency_file.name}")
+            print(f"  Shape: {adjacency.shape}")
+            # Convert adjacency to distance matrix using shortest paths
+            print(f"  Converting adjacency matrix to distance matrix...")
+            distance_matrix = shortest_path(
+                csgraph=adjacency,
+                directed=False,
+                unweighted=False,
+                method='auto'
+            )
+            # Replace infinities with large finite value
+            distance_matrix[np.isinf(distance_matrix)] = np.max(distance_matrix[np.isfinite(distance_matrix)]) * 2
+            print(f"  Distance matrix shape: {distance_matrix.shape}")
+            return distance_matrix, 'adjacency'
+        else:
+            raise FileNotFoundError(
+                f"Neither distance matrix nor adjacency matrix found for {dataset_name} in {graph_dir}\n"
+                f"  Expected: {distance_file.name} or {adjacency_file.name}"
+            )
+    elif matrix_type == 'distance':
+        if not distance_file.exists():
+            raise FileNotFoundError(f"Distance matrix not found: {distance_file}")
+        matrix = np.load(distance_file)
+        print(f"  Loaded distance matrix from: {distance_file.name}")
+        print(f"  Shape: {matrix.shape}")
+        return matrix, 'distance'
+    elif matrix_type == 'adjacency':
+        if not adjacency_file.exists():
+            raise FileNotFoundError(f"Adjacency matrix not found: {adjacency_file}")
+        adjacency = np.load(adjacency_file)
+        print(f"  Loaded adjacency matrix from: {adjacency_file.name}")
+        print(f"  Shape: {adjacency.shape}")
+        # Convert adjacency to distance matrix using shortest paths
+        print(f"  Converting adjacency matrix to distance matrix...")
+        distance_matrix = shortest_path(
+            csgraph=adjacency,
+            directed=False,
+            unweighted=False,
+            method='auto'
+        )
+        # Replace infinities with large finite value
+        distance_matrix[np.isinf(distance_matrix)] = np.max(distance_matrix[np.isfinite(distance_matrix)]) * 2
+        print(f"  Distance matrix shape: {distance_matrix.shape}")
+        return distance_matrix, 'adjacency'
+    else:
+        raise ValueError(f"Invalid matrix_type: {matrix_type} (must be 'auto', 'distance', or 'adjacency')")
 
 
 def load_trajectory(walks_csv, walk_id=None, trajectory_idx=None):
@@ -106,7 +180,7 @@ def apply_umap(distance_matrix, n_components=3, min_dist=0.2, n_neighbors=20, ra
     return reduced
 
 
-def load_graph_info(graph_dir):
+def load_graph_info(graph_dir, dataset_name):
     """
     Load graph nodes information.
     
@@ -115,20 +189,19 @@ def load_graph_info(graph_dir):
     """
     graph_dir = Path(graph_dir)
     
-    # Try to find nodes file to get dataset name
-    nodes_files = list(graph_dir.glob('nodes_*.csv'))
-    if not nodes_files:
-        raise FileNotFoundError(f"Could not find graph files in {graph_dir}")
+    # Load nodes file
+    nodes_file = graph_dir / f"nodes_{dataset_name}.csv"
+    if not nodes_file.exists():
+        raise FileNotFoundError(f"Nodes file not found: {nodes_file}")
     
-    # Extract dataset name from nodes file
-    dataset_name = nodes_files[0].stem.replace('nodes_', '')
+    nodes_df = pd.read_csv(nodes_file)
     
     # Polygon-based graphs don't have grid coordinates (i, j)
     # Return None to indicate grid-based visualization is not available
     return None, None, None
 
 
-def create_2d_grid_plot(node_to_grid, H, W, trajectory, trajectory_positions, output_file):
+def create_2d_grid_plot(node_to_grid, H, W, trajectory, trajectory_positions, adjacency_matrix, output_file):
     """
     Create 2D grid plot showing H×W surface with trajectory using plotly.
     
@@ -154,6 +227,36 @@ def create_2d_grid_plot(node_to_grid, H, W, trajectory, trajectory_positions, ou
     
     # Create figure
     fig = go.Figure()
+    
+    # Plot neighborhood edges (semi-transparent lines) if adjacency matrix is available
+    if adjacency_matrix is not None:
+        # Find all edges (non-zero entries in upper triangle of adjacency matrix)
+        n_nodes = adjacency_matrix.shape[0]
+        edge_x = []
+        edge_y = []
+        for i in range(n_nodes):
+            for j in range(i + 1, n_nodes):
+                if adjacency_matrix[i, j] > 0:
+                    # Check if both nodes are in grid_positions
+                    if i in grid_positions and j in grid_positions:
+                        i_coord, j_coord_i = grid_positions[i]
+                        i_coord_j, j_coord_j = grid_positions[j]
+                        # Add edge coordinates (j is x, i is y)
+                        edge_x.extend([j_coord_i, j_coord_j, None])
+                        edge_y.extend([i_coord, i_coord_j, None])
+        
+        if len(edge_x) > 0:
+            fig.add_trace(go.Scatter(
+                x=edge_x,
+                y=edge_y,
+                mode='lines',
+                line=dict(
+                    width=2.5,
+                    color='rgba(80, 80, 80, 0.5)'  # Darker, more visible gray
+                ),
+                hoverinfo='skip',
+                showlegend=False
+            ))
     
     # Plot background points with Viridis colormap (like 3D plot)
     x_bg_points = []
@@ -181,7 +284,7 @@ def create_2d_grid_plot(node_to_grid, H, W, trajectory, trajectory_positions, ou
         showlegend=False
     ))
     
-    # Plot trajectory if present
+    # Plot trajectory if present (bold gradient line only)
     if len(trajectory) > 0 and len(trajectory_positions) > 0:
         # Get grid coordinates for trajectory nodes
         traj_grid_coords = []
@@ -192,40 +295,67 @@ def create_2d_grid_plot(node_to_grid, H, W, trajectory, trajectory_positions, ou
                 traj_grid_coords.append((j, i))  # Plotly uses (x, y) = (j, i)
                 valid_positions.append(trajectory_positions[idx])
         
-        if len(traj_grid_coords) > 0:
+        if len(traj_grid_coords) > 1:
             traj_grid_coords = np.array(traj_grid_coords)
             valid_positions = np.array(valid_positions)
             
-            # Plot trajectory: first add black connecting line (beneath markers)
-            fig.add_trace(go.Scatter(
-                x=traj_grid_coords[:, 0],
-                y=traj_grid_coords[:, 1],
-                mode='lines',
-                line=dict(
-                    width=4,
-                    color='black'
-                ),
-                line_shape='spline',
-                hoverinfo='skip',
-                showlegend=False,
-                opacity=0.2 
-            ))
+            # Normalize positions to [0, 1] for color mapping
+            if valid_positions.max() > valid_positions.min():
+                normalized_positions = (valid_positions - valid_positions.min()) / (valid_positions.max() - valid_positions.min())
+            else:
+                normalized_positions = np.zeros_like(valid_positions)
             
-            # Then add gradient-colored markers (on top of line)
-            fig.add_trace(go.Scatter(
-                x=traj_grid_coords[:, 0],
-                y=traj_grid_coords[:, 1],
-                mode='markers',
-                marker=dict(
-                    size=16,  # Larger markers
-                    color=valid_positions.tolist(),
-                    colorscale='Hot',
-                    showscale=False,
-                    line=dict(color='rgba(0,0,0,0.2)', width=2)  # <--- Black outline with opacity 0.5
-                ),
-                hoverinfo='skip',
-                showlegend=False
-            ))
+            # Create gradient line by plotting segments between consecutive points
+            # Each segment gets its color from the starting position
+            # Get Hot colormap
+            hot_cmap = plt.cm.get_cmap('hot')
+            
+            # Plot segments for smooth gradient effect with curvature
+            for i in range(len(traj_grid_coords) - 1):
+                pos = normalized_positions[i]
+                # Get RGB color from Hot colormap
+                rgba = hot_cmap(pos)
+                color_str = f'rgba({int(rgba[0]*255)}, {int(rgba[1]*255)}, {int(rgba[2]*255)}, {rgba[3]})'
+                
+                # Interpolate intermediate points for smoother curves
+                # Use 3 points: start, middle, end for better spline curvature
+                x_start, y_start = traj_grid_coords[i, 0], traj_grid_coords[i, 1]
+                x_end, y_end = traj_grid_coords[i+1, 0], traj_grid_coords[i+1, 1]
+                
+                # Create a slight intermediate point for curvature
+                # Offset perpendicular to the line direction
+                dx = x_end - x_start
+                dy = y_end - y_start
+                # Perpendicular direction
+                perp_x = -dy
+                perp_y = dx
+                length = np.sqrt(dx*dx + dy*dy)
+                if length > 0:
+                    # Normalize perpendicular
+                    perp_x /= length
+                    perp_y /= length
+                    # Curvature proportional to line length - longer lines get more curvature
+                    curvature_offset = length * 0.25  # Proportional to length, no cap
+                    x_mid = (x_start + x_end) / 2 + perp_x * curvature_offset
+                    y_mid = (y_start + y_end) / 2 + perp_y * curvature_offset
+                else:
+                    x_mid = (x_start + x_end) / 2
+                    y_mid = (y_start + y_end) / 2
+                
+                # Plot segment with 3 points for smooth spline curve
+                fig.add_trace(go.Scatter(
+                    x=[x_start, x_mid, x_end],
+                    y=[y_start, y_mid, y_end],
+                    mode='lines',
+                    line=dict(
+                        width=8,  # Bold line
+                        color=color_str,
+                        smoothing=1.0  # Maximum smoothing for spline
+                    ),
+                    line_shape='spline',
+                    hoverinfo='skip',
+                    showlegend=False
+                ))
     
     # Update layout - remove axes, labels, ticks, titles
     fig.update_layout(
@@ -265,7 +395,7 @@ def create_2d_grid_plot(node_to_grid, H, W, trajectory, trajectory_positions, ou
         print(f"  Saved 2D grid HTML to {Path(html_file).name}")
 
 def create_interactive_3d_html(umap_data, trajectory_indices, trajectory_positions,
-                               output_file, title=""):
+                               adjacency_matrix, output_file, title=""):
     """Create interactive 3D HTML plot with plotly"""
     if not PLOTLY_AVAILABLE:
         print("  Skipping interactive HTML (plotly not available)")
@@ -283,6 +413,34 @@ def create_interactive_3d_html(umap_data, trajectory_indices, trajectory_positio
     
     # Create figure
     fig = go.Figure()
+    
+    # Plot neighborhood edges (semi-transparent lines) if adjacency matrix is available
+    if adjacency_matrix is not None:
+        n_nodes = min(len(umap_data), adjacency_matrix.shape[0])
+        edge_x = []
+        edge_y = []
+        edge_z = []
+        for i in range(n_nodes):
+            for j in range(i + 1, n_nodes):
+                if adjacency_matrix[i, j] > 0:
+                    # Add edge coordinates
+                    edge_x.extend([umap_data[i, 0], umap_data[j, 0], None])
+                    edge_y.extend([umap_data[i, 1], umap_data[j, 1], None])
+                    edge_z.extend([umap_data[i, 2], umap_data[j, 2], None])
+        
+        if len(edge_x) > 0:
+            fig.add_trace(go.Scatter3d(
+                x=edge_x,
+                y=edge_y,
+                z=edge_z,
+                mode='lines',
+                line=dict(
+                    width=3,
+                    color='rgba(80, 80, 80, 0.5)'  # Darker, more visible gray
+                ),
+                hoverinfo='skip',
+                showlegend=False
+            ))
     
     # Add background point cloud with twilight colormap (plotly built-in)
     fig.add_trace(go.Scatter3d(
@@ -382,19 +540,22 @@ def create_interactive_3d_html(umap_data, trajectory_indices, trajectory_positio
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Visualize UMAP embedding from fuzzy neighborhood with trajectory overlay'
+        description='Visualize UMAP embedding from dataset neighboring matrix with trajectory overlay'
     )
-    parser.add_argument('--fuzzy_dir', type=str, required=True,
-                      help='Directory with fuzzy neighborhood distance matrices')
-    parser.add_argument('--key', type=str, required=True,
-                      help='Representation key (e.g., layer_1_after_block)')
+    parser.add_argument('--graph_dir', type=str, required=True,
+                      help='Directory with graph files (adjacency/distance matrices, nodes CSV)')
+    parser.add_argument('--dataset_name', type=str, required=True,
+                      help='Dataset name (e.g., torus_30x40)')
+    parser.add_argument('--matrix_type', type=str, default='auto',
+                      choices=['auto', 'distance', 'adjacency'],
+                      help='Matrix type to use: auto (prefer distance), distance, or adjacency')
     parser.add_argument('--walks_csv', type=str, required=True,
                       help='Path to walks CSV file (e.g., sequences/walks_*.csv)')
     parser.add_argument('--walk_id', type=int, default=None,
                       help='Walk ID to use (if not specified, uses --trajectory_idx)')
     parser.add_argument('--trajectory_idx', type=int, default=0,
                       help='Index of trajectory in CSV (0-based, default: 0)')
-    parser.add_argument('--output_dir', type=str, default='./umap_plot',
+    parser.add_argument('--output_dir', type=str, default='./umap_dataset_plot',
                       help='Output directory for plots')
     parser.add_argument('--umap_n_components', type=int, default=3,
                       help='UMAP target dimensions (default: 3)')
@@ -406,8 +567,6 @@ def main():
                       help='Random seed for UMAP (default: None, for reproducibility set to integer)')
     parser.add_argument('--max_length', type=int, default=128,
                       help='Maximum number of points to plot in trajectory (default: 128)')
-    parser.add_argument('--graph_dir', type=str, default=None,
-                      help='Directory with graph files (nodes CSV, graph_info JSON). If not provided, will try to infer from paths.')
     
     args = parser.parse_args()
     
@@ -416,7 +575,7 @@ def main():
         args.umap_n_components = 3
     
     print("="*60)
-    print("UMAP Visualization with Trajectory")
+    print("UMAP Visualization from Dataset Matrix with Trajectory")
     print("="*60)
     
     # Load trajectory first (needed for 2D plot, doesn't need UMAP)
@@ -438,67 +597,52 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Generate output filename
-    output_base = f"{args.key}_walk_{walk_id}_umap_3d"
+    output_base = f"dataset_{args.matrix_type}_walk_{walk_id}_umap_3d"
     
-    # Try to load graph info for 2D plot (before UMAP)
-    graph_dir = None
+    # Load graph info for 2D plot (before UMAP)
+    graph_dir = Path(args.graph_dir)
     node_to_grid = None
     H = None
     W = None
     
-    if args.graph_dir:
-        graph_dir = Path(args.graph_dir)
-    else:
-        # Try to infer graph directory from fuzzy_dir or walks_csv
-        fuzzy_path = Path(args.fuzzy_dir)
-        walks_path = Path(args.walks_csv)
-        
-        # Look for graph directory in common locations
-        possible_graph_dirs = [
-            fuzzy_path.parent.parent / 'graph',  # results/DATASET/graph
-            walks_path.parent.parent / 'graph',   # results/DATASET/graph
-            fuzzy_path.parent / 'graph',           # fuzzy_dir/../graph
-            walks_path.parent / 'graph',           # walks_dir/../graph
-        ]
-        
-        for gd in possible_graph_dirs:
-            if gd.exists() and (list(gd.glob('graph_info_*.json')) or list(gd.glob('nodes_*.csv'))):
-                graph_dir = gd
-                break
+    try:
+        print(f"\nLoading graph info from: {graph_dir}")
+        node_to_grid, H, W = load_graph_info(graph_dir, args.dataset_name)
+        print(f"  Grid dimensions: H={H}, W={W}")
+        print(f"  Loaded {len(node_to_grid)} node mappings")
+    except Exception as e:
+        print(f"  Warning: Could not load graph info: {e}")
+        print(f"  Skipping 2D grid plot")
+        node_to_grid = None
     
-    node_to_grid = None
-    H = None
-    W = None
-    if graph_dir and graph_dir.exists():
-        try:
-            print(f"\nLoading graph info from: {graph_dir}")
-            node_to_grid, H, W = load_graph_info(graph_dir)
-            if node_to_grid is not None and H is not None and W is not None:
-                print(f"  Grid dimensions: H={H}, W={W}")
-                print(f"  Loaded {len(node_to_grid)} node mappings")
-            else:
-                print(f"  Polygon-based graph detected (no grid coordinates available)")
-                print(f"  2D grid plot will be skipped")
-        except Exception as e:
-            print(f"  Warning: Could not load graph info: {e}")
-            print(f"  Skipping 2D grid plot")
-            node_to_grid = None
-    else:
-        print(f"\nWarning: Graph directory not found. Skipping 2D grid plot.")
-        print(f"  To enable 2D plot, provide --graph_dir argument")
+    # Load adjacency matrix for neighborhood edges
+    adjacency_matrix = None
+    try:
+        print(f"\nLoading adjacency matrix for neighborhood edges...")
+        adjacency_matrix = load_adjacency_matrix(args.graph_dir, args.dataset_name)
+        if adjacency_matrix is not None:
+            print(f"  Loaded adjacency matrix: shape {adjacency_matrix.shape}")
+        else:
+            print(f"  Adjacency matrix not found, skipping neighborhood edges")
+    except Exception as e:
+        print(f"  Warning: Could not load adjacency matrix: {e}")
+        print(f"  Neighborhood edges will be skipped")
     
     # Save 2D grid plot if graph info is available (before UMAP)
     pdf_file = None
-    if graph_dir and node_to_grid is not None and H is not None and W is not None:
+    if node_to_grid is not None:
         pdf_file = output_dir / f"{output_base}_grid_2d.pdf"
         create_2d_grid_plot(
             node_to_grid, H, W, limited_trajectory, trajectory_positions,
-            str(pdf_file)
+            adjacency_matrix, str(pdf_file)
         )
     
-    # Load fuzzy distance matrix for UMAP
-    print(f"\nLoading fuzzy distance matrix for key: {args.key}")
-    distance_matrix, pca_data = load_fuzzy_distance_matrix(args.fuzzy_dir, args.key)
+    # Load dataset matrix for UMAP
+    print(f"\nLoading dataset matrix (type: {args.matrix_type})...")
+    distance_matrix, matrix_type_used = load_dataset_matrix(
+        args.graph_dir, args.dataset_name, args.matrix_type
+    )
+    print(f"  Matrix type used: {matrix_type_used}")
     print(f"  Distance matrix shape: {distance_matrix.shape}")
     
     # Apply UMAP
@@ -513,7 +657,6 @@ def main():
     
     # Map trajectory node IDs to indices in UMAP data
     # Assuming node IDs are 0-indexed or can be mapped directly
-    # If node IDs don't match indices, we need to handle mapping
     try:
         trajectory_indices = np.array(limited_trajectory, dtype=int)
         # Check if indices are valid
@@ -533,19 +676,22 @@ def main():
         trajectory_positions = np.array([])
     
     # Create title
-    title = f"{args.key}\nWalk {walk_id} ({len(trajectory_indices)} nodes)"
+    title = f"Dataset Matrix ({matrix_type_used})\nWalk {walk_id} ({len(trajectory_indices)} nodes)"
     
     # Save HTML
     if PLOTLY_AVAILABLE:
         html_file = output_dir / f"{output_base}.html"
         create_interactive_3d_html(
             umap_data, trajectory_indices, trajectory_positions,
-            str(html_file), title=title
+            adjacency_matrix, str(html_file), title=title
         )
+    else:
+        html_file = None
     
     # Save metadata
     metadata = {
-        'key': args.key,
+        'dataset_name': args.dataset_name,
+        'matrix_type': matrix_type_used,
         'walk_id': int(walk_id),
         'trajectory_length': len(trajectory),
         'trajectory_nodes': trajectory[:100] if len(trajectory) <= 100 else trajectory[:100] + ['...'],  # First 100 nodes
@@ -565,8 +711,8 @@ def main():
             'walks_csv': args.walks_csv
         },
         'output_files': {
-            'html': str(html_file.name) if PLOTLY_AVAILABLE else None,
-            'pdf_2d': str(pdf_file.name) if graph_dir and node_to_grid is not None else None
+            'html': str(html_file.name) if html_file and PLOTLY_AVAILABLE else None,
+            'pdf_2d': str(pdf_file.name) if node_to_grid is not None else None
         }
     }
     
@@ -579,13 +725,12 @@ def main():
     print("Visualization complete!")
     print(f"{'='*60}")
     print(f"\nResults saved to: {output_dir}")
-    if PLOTLY_AVAILABLE:
+    if PLOTLY_AVAILABLE and html_file:
         print(f"  HTML: {html_file.name}")
-    if graph_dir and node_to_grid is not None:
+    if node_to_grid is not None and pdf_file:
         print(f"  PDF (2D grid): {pdf_file.name}")
     print(f"  Metadata: {metadata_file.name}")
 
 
 if __name__ == '__main__':
     main()
-
