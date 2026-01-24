@@ -18,6 +18,10 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
 # Local configuration
+# HuggingFace cache directory (default: tinystories workspace)
+# Set to workspace directory to avoid using ~/.cache
+HF_CACHE_DIR=${HF_CACHE_DIR:-"/hkfs/work/workspace/scratch/hgf_mxv5488-tinystories"}
+
 # Target dataset configuration
 TARGET_DATASET_NAME=${TARGET_DATASET_NAME:-"roneneldan/TinyStories"}
 TARGET_DATASET_CONFIG=${TARGET_DATASET_CONFIG:-""}
@@ -37,7 +41,7 @@ COMBINED_DATASET_DIR=${COMBINED_DATASET_DIR:-./${DATA_DIR}/combined_dataset}
 
 # Insertion parameters
 # Power law distribution: most sequences have few source tokens, few have many
-MIN_SOURCE_PER_SEQ=${MIN_SOURCE_PER_SEQ:-2}
+MIN_SOURCE_PER_SEQ=${MIN_SOURCE_PER_SEQ:-4}
 MAX_SOURCE_PER_SEQ=${MAX_SOURCE_PER_SEQ:-""}
 POWER_LAW_ALPHA=${POWER_LAW_ALPHA:-2.0}
 SOURCE_RATIO=${SOURCE_RATIO:-0}
@@ -48,6 +52,7 @@ SEED=${SEED:-42}
 
 echo ""
 echo "Configuration:"
+echo "  HuggingFace cache dir: ${HF_CACHE_DIR}"
 echo "  Target dataset: ${TARGET_DATASET_NAME}"
 if [ -n "${TARGET_DATASET_CONFIG}" ]; then
     echo "  Dataset config: ${TARGET_DATASET_CONFIG}"
@@ -112,6 +117,23 @@ fi
 if [ -n "${MAX_SOURCE_PER_SEQ}" ]; then
     CMD="$CMD --max_source_per_seq ${MAX_SOURCE_PER_SEQ}"
 fi
+
+# Set HuggingFace cache environment variables to use workspace directory
+# This ensures zero increase in local ~/.cache
+export HF_HOME="${HF_CACHE_DIR}/.cache/huggingface"
+export HF_DATASETS_CACHE="${HF_CACHE_DIR}/.cache/huggingface/datasets"
+export TRANSFORMERS_CACHE="${HF_CACHE_DIR}/.cache/huggingface/transformers"
+
+# Create cache directories if they don't exist
+mkdir -p "${HF_DATASETS_CACHE}"
+mkdir -p "${TRANSFORMERS_CACHE}"
+
+echo ""
+echo "HuggingFace cache configuration:"
+echo "  HF_HOME: ${HF_HOME}"
+echo "  HF_DATASETS_CACHE: ${HF_DATASETS_CACHE}"
+echo "  TRANSFORMERS_CACHE: ${TRANSFORMERS_CACHE}"
+echo ""
 
 echo "Preparing combined dataset..."
 eval $CMD

@@ -1,4 +1,10 @@
 #!/bin/bash
+#SBATCH --job-name=combined_model_training
+#SBATCH --partition=accelerated
+#SBATCH --time=18:00:00
+#SBATCH --gres=gpu:1
+#SBATCH --output=combined_model_training_%j.out
+#SBATCH --error=combined_model_training_%j.err
 
 # Train model on combined dataset (target + source tokens)
 #
@@ -6,6 +12,8 @@
 # both natural language text and source graph tokens. Training parameters
 # can be customized via environment variables.
 
+
+cd /home/hk-project-p0022189/hgf_mxv5488/TOPO_LLM_Xian/LLM-Topo/src
 set -e
 
 echo "=========================================="
@@ -20,12 +28,12 @@ source "${SCRIPT_DIR}/00_config_env.sh"
 CONFIG="${CONFIG:-configs/config_${RUN_NAME}.json}"
 OUTPUT_DIR="${OUTPUT_DIR:-./${WORK_DIR}}"
 EPOCHS="${EPOCHS:-1}"
-BATCH_SIZE="${BATCH_SIZE:-32}"
+BATCH_SIZE="${BATCH_SIZE:-16}"
 GRAD_ACCUM="${GRAD_ACCUM:-16}"
 LEARNING_RATE="${LEARNING_RATE:-5e-4}"
 MAX_LENGTH="${MAX_LENGTH:-640}"
-SAVE_STEPS="${SAVE_STEPS:-20}"     # should be integer multiple of eval_steps
-EVAL_STEPS="${EVAL_STEPS:-20}"
+SAVE_STEPS="${SAVE_STEPS:-100}"     # should be integer multiple of eval_steps
+EVAL_STEPS="${EVAL_STEPS:-50}"
 LOGGING_STEPS="${LOGGING_STEPS:-2}"
 LOG_DIR="${LOG_DIR:-${OUTPUT_DIR}}"
 SAVE_TOTAL_LIMIT="${SAVE_TOTAL_LIMIT:-all}"  # Number of checkpoints to keep, or "all" to save all

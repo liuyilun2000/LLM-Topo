@@ -20,8 +20,8 @@ source "${SCRIPT_DIR}/00_config_env.sh"
 # Local configuration
 
 # Barcode parameters
-MAX_BARS="${MAX_BARS:-30}"
-TOP_K="${TOP_K:-0}"
+MAX_BARS="${MAX_BARS:-20}"
+TOP_K="${TOP_K:-4}"
 
 echo ""
 echo "Configuration:"

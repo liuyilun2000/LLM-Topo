@@ -169,5 +169,6 @@ viz_*
 # Project scripts not to be tracked
 utils.sh
 
-
 ref/
+*.err
+*.out
