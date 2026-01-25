@@ -16,10 +16,8 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
 # Local configuration
-# Construct dataset name to match sequence generation output
-# Use prefix + topology rule: {PREFIX}_{TOPOLOGY_RULE}_n{N}_k{K_EDGE}_iter{ITERS}
-DATASET_NAME_PYTHON="${TOPOLOGY_PREFIX}_${TOPOLOGY_RULE}_n${N}_k${K_EDGE}_iter${ITERS}"
-INPUT_CSV=${INPUT_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME_PYTHON}.csv}
+# DATASET_NAME is loaded from 00_config_env.sh
+INPUT_CSV=${INPUT_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME}.csv}
 TRAIN_SPLIT=${TRAIN_SPLIT:-0.95}
 
 echo ""

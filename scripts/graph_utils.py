@@ -15,7 +15,7 @@ def load_graph(graph_dir: str, dataset_name: str) -> Tuple[np.ndarray, List[str]
     
     Args:
         graph_dir: Directory containing graph files
-        dataset_name: Name of the dataset (e.g., "abAB_n2_k25_iter200")
+        dataset_name: Name of the dataset (e.g., "torus_abAB_N800_iter200")
         
     Returns:
         A: Adjacency matrix (N x N)

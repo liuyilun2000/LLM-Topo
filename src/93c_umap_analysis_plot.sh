@@ -27,10 +27,9 @@ MODEL_DIR="${MODEL_DIR:-./${WORK_DIR}/final_model}"
 # Fuzzy neighborhood directory
 FUZZY_DIR="${FUZZY_DIR:-${MODEL_DIR}/fuzzy_neighborhood}"
 
-# Walks CSV file - construct dataset name to match sequence generation output
-# Use prefix + topology rule: {PREFIX}_{TOPOLOGY_RULE}_n{N}_k{K_EDGE}_iter{ITERS}
-DATASET_NAME_PYTHON="${TOPOLOGY_PREFIX}_${TOPOLOGY_RULE}_n${N}_k${K_EDGE}_iter${ITERS}"
-WALKS_CSV="${WALKS_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME_PYTHON}.csv}"
+# Walks CSV file
+# DATASET_NAME is loaded from 00_config_env.sh
+WALKS_CSV="${WALKS_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME}.csv}"
 
 # Representation key (e.g., "layer_1_after_block", "input_embeds", etc.)
 KEY="${KEY:-layer_5_hidden}"

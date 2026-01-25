@@ -15,33 +15,31 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Variables N, K_EDGE, ITERS, TOPOLOGY_RULE are loaded from 00_config_env.sh
+# Variables N, N_TOTAL, ITERS, TOPOLOGY_RULE are loaded from 00_config_env.sh
 # They must match the values used in 01a_graph_generation.sh
 
 # Walk generation parameters
 MAX_LENGTH=${MAX_LENGTH:-128}
-MAX_SEQS=${MAX_SEQS:-120000}
+# MAX_SEQS=${MAX_SEQS:-120000}
+MAX_SEQS=${MAX_SEQS:-1200}
 MIN_VISITS_PER_NODE=${MIN_VISITS_PER_NODE:-10000000000}
 NO_REPEAT_WINDOW=${NO_REPEAT_WINDOW:-32}
 RESTART_PROB=${RESTART_PROB:-0}
 TEMPERATURE=${TEMPERATURE:-1}
 SEED=${SEED:-42}
 
-# Variables SEQUENCE_DIR, DATA_DIR are loaded from 00_config_env.sh
+# Variables SEQUENCE_DIR, DATA_DIR, DATASET_NAME are loaded from 00_config_env.sh
 mkdir -p "${SEQUENCE_DIR}"
 
-# Construct dataset name (must match what 01a_graph_generation.py produces)
-# Use prefix + topology rule: {PREFIX}_{TOPOLOGY_RULE}_n{N}_k{K_EDGE}_iter{ITERS}
-DATASET_NAME_PYTHON="${TOPOLOGY_PREFIX}_${TOPOLOGY_RULE}_n${N}_k${K_EDGE}_iter${ITERS}"
-OUT=${OUT:-${SEQUENCE_DIR}/walks_${DATASET_NAME_PYTHON}.csv}
-COUNTS_OUT=${COUNTS_OUT:-${SEQUENCE_DIR}/visit_counts_${DATASET_NAME_PYTHON}.csv}
+# Use centralized DATASET_NAME from config
+OUT=${OUT:-${SEQUENCE_DIR}/walks_${DATASET_NAME}.csv}
+COUNTS_OUT=${COUNTS_OUT:-${SEQUENCE_DIR}/visit_counts_${DATASET_NAME}.csv}
 
 echo ""
 echo "Configuration:"
 echo "  Topology prefix: ${TOPOLOGY_PREFIX}"
 echo "  Topology rule: ${TOPOLOGY_RULE}"
-echo "  Polygon n: ${N}"
-echo "  K_edge: ${K_EDGE}"
+echo "  Total points: ${N_TOTAL}"
 echo "  Iters: ${ITERS}"
 echo "  Graph directory: ${GRAPH_DIR}"
 echo "  Output: ${OUT}"
@@ -58,7 +56,7 @@ echo "  Seed: ${SEED}"
 echo ""
 
 # Check if graph files exist
-GRAPH_BASE="${GRAPH_DIR}/A_${DATASET_NAME_PYTHON}_labeled.csv"
+GRAPH_BASE="${GRAPH_DIR}/A_${DATASET_NAME}_labeled.csv"
 if [ ! -f "$GRAPH_BASE" ]; then
     echo "Error: Graph file not found: $GRAPH_BASE"
     echo "Please run ./01a_graph_generation.sh first to create the graph representation."
@@ -70,8 +68,7 @@ python ../scripts/01b_sequence_generation.py \
     --graph_dir "${GRAPH_DIR}" \
     --topology "${TOPOLOGY_RULE}" \
     --prefix "${TOPOLOGY_PREFIX}" \
-    --n ${N} \
-    --K_edge ${K_EDGE} \
+    --N_total ${N_TOTAL} \
     --iters ${ITERS} \
     --max_length ${MAX_LENGTH} \
     --max_seqs ${MAX_SEQS} \

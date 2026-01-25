@@ -21,12 +21,10 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Variables GRAPH_DIR, DATA_DIR, N, K_EDGE, ITERS, TOPOLOGY_RULE are loaded from 00_config_env.sh
+# Variables GRAPH_DIR, DATA_DIR, DATASET_NAME are loaded from 00_config_env.sh
 
-# Walks CSV file - construct dataset name to match sequence generation output
-# Use prefix + topology rule: {PREFIX}_{TOPOLOGY_RULE}_n{N}_k{K_EDGE}_iter{ITERS}
-DATASET_NAME_PYTHON="${TOPOLOGY_PREFIX}_${TOPOLOGY_RULE}_n${N}_k${K_EDGE}_iter${ITERS}"
-WALKS_CSV="${WALKS_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME_PYTHON}.csv}"
+# Walks CSV file
+WALKS_CSV="${WALKS_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME}.csv}"
 
 # Matrix type: "adjacency" or "distance" (default: distance if available, else adjacency)
 MATRIX_TYPE="${MATRIX_TYPE:-auto}"
@@ -50,7 +48,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-./${DATA_DIR}/umap_dataset_plot}"
 echo ""
 echo "Configuration:"
 echo "  Graph dir: $GRAPH_DIR"
-echo "  Dataset: $DATASET_NAME_PYTHON"
+echo "  Dataset: $DATASET_NAME"
 echo "  Matrix type: $MATRIX_TYPE"
 echo "  Walks CSV: $WALKS_CSV"
 if [ -n "$WALK_ID" ]; then
@@ -78,8 +76,8 @@ if [ ! -d "$GRAPH_DIR" ]; then
 fi
 
 # Check for distance matrix first (preferred), then adjacency matrix
-DISTANCE_FILE="${GRAPH_DIR}/distance_matrix_${DATASET_NAME_PYTHON}.npy"
-ADJACENCY_FILE="${GRAPH_DIR}/A_${DATASET_NAME_PYTHON}.npy"
+DISTANCE_FILE="${GRAPH_DIR}/distance_matrix_${DATASET_NAME}.npy"
+ADJACENCY_FILE="${GRAPH_DIR}/A_${DATASET_NAME}.npy"
 
 if [ "$MATRIX_TYPE" = "auto" ]; then
     if [ -f "$DISTANCE_FILE" ]; then
@@ -130,7 +128,7 @@ echo "Generating visualization..."
 if [ -n "$WALK_ID" ]; then
     python ../scripts/01d_umap_dataset_plot.py \
         --graph_dir "$GRAPH_DIR" \
-        --dataset_name "$DATASET_NAME_PYTHON" \
+        --dataset_name "$DATASET_NAME" \
         --matrix_type "$MATRIX_TYPE" \
         --walks_csv "$WALKS_CSV" \
         --walk_id "$WALK_ID" \
@@ -143,7 +141,7 @@ if [ -n "$WALK_ID" ]; then
 else
     python ../scripts/01d_umap_dataset_plot.py \
         --graph_dir "$GRAPH_DIR" \
-        --dataset_name "$DATASET_NAME_PYTHON" \
+        --dataset_name "$DATASET_NAME" \
         --matrix_type "$MATRIX_TYPE" \
         --walks_csv "$WALKS_CSV" \
         --trajectory_idx "$TRAJECTORY_IDX" \

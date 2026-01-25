@@ -31,10 +31,8 @@ TARGET_TOKENIZER_NAME=${TARGET_TOKENIZER_NAME:-""}
 MAX_TARGET_SAMPLES=${MAX_TARGET_SAMPLES:-""}
 
 # Source dataset (from previous steps)
-# Construct dataset name to match sequence generation output
-# Use prefix + topology rule: {PREFIX}_{TOPOLOGY_RULE}_n{N}_k{K_EDGE}_iter{ITERS}
-DATASET_NAME_PYTHON="${TOPOLOGY_PREFIX}_${TOPOLOGY_RULE}_n${N}_k${K_EDGE}_iter${ITERS}"
-SOURCE_CSV=${SOURCE_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME_PYTHON}.csv}
+# DATASET_NAME is loaded from 00_config_env.sh
+SOURCE_CSV=${SOURCE_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME}.csv}
 
 # Output directory
 COMBINED_DATASET_DIR=${COMBINED_DATASET_DIR:-./${DATA_DIR}/combined_dataset}

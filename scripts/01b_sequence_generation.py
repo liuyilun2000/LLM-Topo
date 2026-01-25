@@ -119,10 +119,8 @@ def main():
                     help="Topology rule string: use capital letters for reversed edges (A=a^-1, B=b^-1, etc.). Example: 'abAB' for torus")
     ap.add_argument("--prefix", type=str, default=None,
                     help="Topology prefix for dataset naming (e.g., 'torus', 'klein', 'sphere'). Must match the prefix used in graph generation.")
-    ap.add_argument("--n", type=int, required=True,
-                    help="n in 2n-polygon (e.g., 2)")
-    ap.add_argument("--K_edge", type=int, required=True,
-                    help="Points per edge (e.g., 25)")
+    ap.add_argument("--N_total", type=int, required=True,
+                    help="Total number of points (must match graph generation)")
     ap.add_argument("--iters", type=int, required=True,
                     help="Relaxation iterations (e.g., 200)")
     
@@ -152,11 +150,11 @@ def main():
     args = ap.parse_args()
     
     # Construct dataset name to match generator (must include prefix if used in graph generation)
-    # Topology rule should already be in capital letter form (e.g., abAB instead of aba^-1b^-1)
+    # This matches the naming convention from 01a_graph_generation.py
     if args.prefix:
-        dataset_name = f"{args.prefix}_{args.topology}_n{args.n}_k{args.K_edge}_iter{args.iters}"
+        dataset_name = f"{args.prefix}_{args.topology}_N{args.N_total}_iter{args.iters}"
     else:
-        dataset_name = f"{args.topology}_n{args.n}_k{args.K_edge}_iter{args.iters}"
+        dataset_name = f"{args.topology}_N{args.N_total}_iter{args.iters}"
     
     # Auto-generate output paths if not provided
     data_dir = "./data/sequences"

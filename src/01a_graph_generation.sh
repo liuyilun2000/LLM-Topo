@@ -16,16 +16,18 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Variables N, K_EDGE, ITERS, TOPOLOGY_RULE are loaded from 00_config_env.sh
+# Variables N_TOTAL, DENSITY_FACTOR, ITERS, PLOT_INTERVAL, TOPOLOGY_RULE are loaded from 00_config_env.sh
+# N is automatically computed from TOPOLOGY_RULE in 00_config_env.sh
 # They can be overridden via environment variables before running this script
 
 echo ""
 echo "Configuration:"
 echo "  Topology prefix: ${TOPOLOGY_PREFIX}"
 echo "  Topology rule: ${TOPOLOGY_RULE}"
-echo "  Polygon n: ${N}"
-echo "  K_edge: ${K_EDGE}"
+echo "  Total points: ${N_TOTAL}"
+echo "  Density factor: ${DENSITY_FACTOR}"
 echo "  Iters: ${ITERS}"
+echo "  Plot interval: ${PLOT_INTERVAL}"
 echo "  Output directory: ${GRAPH_DIR}"
 echo "  Dataset: ${DATASET_NAME}"
 echo ""
@@ -34,13 +36,27 @@ echo ""
 # Note: The Python script will handle the actual dataset name construction
 # This is just for display purposes
 echo "Generating graph representation..."
-python ../scripts/01a_graph_generation.py \
-    --n ${N} \
-    --K_edge ${K_EDGE} \
-    --iters ${ITERS} \
-    --topology "${TOPOLOGY_RULE}" \
-    --prefix "${TOPOLOGY_PREFIX}" \
+
+# Build command arguments
+CMD_ARGS=(
+    --iters "${ITERS}"
+    --plot_interval "${PLOT_INTERVAL}"
+    --topology "${TOPOLOGY_RULE}"
+    --prefix "${TOPOLOGY_PREFIX}"
     --output_dir "${GRAPH_DIR}"
+)
+
+# Add N_total if set (not empty)
+if [ -n "${N_TOTAL}" ]; then
+    CMD_ARGS+=(--N_total "${N_TOTAL}")
+fi
+
+# Add density_factor if set (not empty) - only used if N_total is not provided
+if [ -n "${DENSITY_FACTOR}" ]; then
+    CMD_ARGS+=(--density_factor "${DENSITY_FACTOR}")
+fi
+
+python ../scripts/01a_graph_generation.py "${CMD_ARGS[@]}"
 
 echo ""
 echo "Graph generation complete!"

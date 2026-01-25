@@ -95,6 +95,18 @@ def main():
     print(f"  Matrix type used: {matrix_type_used}")
     print(f"  Distance matrix shape: {distance_matrix.shape}")
     
+    # Handle infinite distances (unreachable nodes) - replace with large finite value
+    num_inf = np.sum(np.isinf(distance_matrix))
+    if num_inf > 0:
+        max_finite_dist = np.max(distance_matrix[np.isfinite(distance_matrix)])
+        if np.isinf(max_finite_dist) or max_finite_dist == 0:
+            max_finite_dist = distance_matrix.shape[0] * 2
+        else:
+            max_finite_dist = max_finite_dist + 1
+        distance_matrix = np.where(np.isfinite(distance_matrix), distance_matrix, max_finite_dist)
+        np.fill_diagonal(distance_matrix, 0.0)
+        print(f"  Fixed {num_inf} infinite distances (replaced with {max_finite_dist:.2f})")
+    
     # Apply UMAP
     print(f"\nApplying UMAP...")
     umap_data, umap_info = apply_umap(

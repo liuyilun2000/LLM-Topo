@@ -6,22 +6,11 @@
 # Source this file in each script: source 00_config_env.sh
 #
 # This file provides centralized configuration for:
-#   - Manifold Geometry (N, K_EDGE, ITERS)
-#   - Topology Gluing Rule
-#   - Dataset naming
+#   - Topology Gluing Rule (N is automatically computed from TOPOLOGY_RULE)
+#   - Manifold Geometry (N_TOTAL, DENSITY_FACTOR, ITERS, PLOT_INTERVAL)
+#   - Dataset naming (DATASET_NAME is automatically generated)
 #   - Run naming
 # ============================================================================
-
-# Manifold Geometry dimensions
-# Polygon-based parameters for repulsive force point distribution
-# IMPORTANT: n determines the number of edges: 2n edges total
-#   - n=2 → 4 edges (square) → suitable for: abAB (torus), abAb (klein), abBA (sphere), abab (projective)
-#   - n=4 → 8 edges (octagon) → suitable for: abABcdCD (double torus)
-#   - n=3 → 6 edges (hexagon) → suitable for custom topologies
-# Make sure n matches your topology rule: topology rule length = 2n
-export N=${N:-4}                    # n in 2n-polygon (2=Square, 3=Hexagon, 4=Octagon, etc.)
-export K_EDGE=${K_EDGE:-15}         # Points per edge (density)
-export ITERS=${ITERS:-200}          # Relaxation iterations
 
 # Topology configuration
 # Topology rule string (Gluing Rules):
@@ -30,25 +19,32 @@ export ITERS=${ITERS:-200}          # Relaxation iterations
 #   - Uppercase letters (A, B, C, ...) = reversed edges (mathematical notation: a^-1, b^-1, c^-1, ...)
 #   
 #   Examples (input the capital letter form directly):
-#   - Sphere                        : abb^-1a^-1   →  abBA
-#   - Sphere (alternative)          : aa^-1bb^-1   →  aAbB
-#   - Torus                         : aba^-1b^-1   →  abAB
-#   - Double torus                  : aba^-1b^-1cdc^-1d^-1  →  abABcdCD
-#   - Projective plane              : abab         →  abab
-#   - Klein Bottle                  : aba^-1b      →  abAb
-#   - Klein Bottle (alternative)    : abab^-1      →  abaB
-#   - custom                  : Any valid gluing string matching 2*N edges
-export TOPOLOGY_RULE=${TOPOLOGY_RULE:-"abABcdCD"}
+#   - Sphere                        : abb^-1a^-1   →  abBA (4 edges → n=2)
+#   - Sphere (alternative)          : aa^-1bb^-1   →  aAbB (4 edges → n=2)
+#   - Torus                         : aba^-1b^-1   →  abAB (4 edges → n=2)
+#   - Double torus                  : aba^-1b^-1cdc^-1d^-1  →  abABcdCD (8 edges → n=4)
+#   - Projective plane              : abab         →  abab (4 edges → n=2)
+#   - Klein Bottle                  : aba^-1b      →  abAb (4 edges → n=2)
+#   - Klein Bottle (alternative)    : abab^-1      →  abaB (4 edges → n=2)
+#   - custom                  : Any valid gluing string (n = length/2)
+export TOPOLOGY_RULE=${TOPOLOGY_RULE:-"abAB"}
 
 export TOPOLOGY_PREFIX="torus"
 
-# Use topology rule directly as directory name (no conversion needed)
-export TOPOLOGY_DIR="$TOPOLOGY_RULE"
 
-# Derived configuration - always recomputed from N, K_EDGE, ITERS, TOPOLOGY_RULE, TOPOLOGY_PREFIX
-# DATASET_NAME is automatically generated with prefix: {PREFIX}_{TOPOLOGY_RULE}_n{N}_k{K_EDGE}_iter{ITERS}
-if [ -n "${N}" ] && [ -n "${K_EDGE}" ] && [ -n "${ITERS}" ] && [ -n "${TOPOLOGY_DIR}" ] && [ -n "${TOPOLOGY_PREFIX}" ]; then
-    export DATASET_NAME="${TOPOLOGY_PREFIX}_${TOPOLOGY_DIR}_n${N}_k${K_EDGE}_iter${ITERS}"
+# Note: N (n in 2n-polygon) is computed internally in 01a_graph_generation.py from TOPOLOGY_RULE
+# It is not needed in bash scripts - only the Python code uses it for polygon construction
+
+# Manifold Geometry dimensions
+export N_TOTAL=${N_TOTAL:-800}      # Total number of points (all points can move freely, no fixed boundary)
+export ITERS=${ITERS:-200}          # Relaxation iterations
+export PLOT_INTERVAL=${PLOT_INTERVAL:-2}  # Interval for saving evolution plots (every N iterations)
+
+# Derived configuration - always recomputed from N_TOTAL, ITERS, TOPOLOGY_RULE, TOPOLOGY_PREFIX
+# DATASET_NAME is automatically generated with prefix: {PREFIX}_{TOPOLOGY_RULE}_N{N_TOTAL}_iter{ITERS}
+# Note: N is only computed internally in 01a_graph_generation.py, not used in dataset naming
+if [ -n "${N_TOTAL}" ] && [ -n "${ITERS}" ] && [ -n "${TOPOLOGY_RULE}" ] && [ -n "${TOPOLOGY_PREFIX}" ]; then
+    export DATASET_NAME="${TOPOLOGY_PREFIX}_${TOPOLOGY_RULE}_N${N_TOTAL}_iter${ITERS}"
 fi
 
 # Run configuration (can be overridden)
