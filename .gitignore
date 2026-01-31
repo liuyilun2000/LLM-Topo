@@ -172,3 +172,5 @@ utils.sh
 ref/
 *.err
 *.out
+
+*.claude

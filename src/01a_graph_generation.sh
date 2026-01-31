@@ -1,75 +1,124 @@
 #!/bin/bash
 
-# Generate graph representation for topology analysis
+# ============================================================================
+# Graph Generation for Topological Manifolds
+# ============================================================================
+# This script generates graph structures from fundamental polygons with
+# edge-gluing rules, representing topological surfaces.
 #
-# This script generates the graph structure using polygon-based repulsive force method.
-# It creates nodes, edges, adjacency matrix, coordinates, and distance matrix
-# for the configured topology and saves them to files for later use in random walk generation.
+# Approach:
+#   1. Create a regular 2n-polygon (fundamental polygon)
+#   2. Sample points uniformly inside (no fixed boundary points)
+#   3. Use repulsive force evolution with periodic boundary conditions
+#   4. Build Voronoi graph in tiled space to capture cross-boundary edges
+#
+# Output files (saved to GRAPH_DIR):
+#   - A_{name}.npy, A_{name}_labeled.csv : Adjacency matrix
+#   - nodes_{name}.csv : Node information with degrees
+#   - coords_{name}.csv, coords_{name}.npy : 2D coordinates
+#   - distance_matrix_{name}.npy : Shortest path distances
+#   - graph_info_{name}.json : Metadata
+#   - graph_visualization.png : Final graph visualization
+#   - evolution_plots/ : Evolution snapshots
+#
+# Usage:
+#   ./01a_graph_generation.sh                    # Use config from 00_config_env.sh
+#   TOPOLOGY_RULE=abAB ./01a_graph_generation.sh # Override topology
+#   N_TOTAL=500 ./01a_graph_generation.sh        # Override point count
+# ============================================================================
 
 set -e
 
+echo ""
 echo "=========================================="
-echo "Graph Generation (Manifold)"
+echo "  Graph Generation (Topological Manifold)"
 echo "=========================================="
+echo ""
 
 # Load shared configuration
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Variables N_TOTAL, DENSITY_FACTOR, ITERS, PLOT_INTERVAL, TOPOLOGY_RULE are loaded from 00_config_env.sh
-# N is automatically computed from TOPOLOGY_RULE in 00_config_env.sh
-# They can be overridden via environment variables before running this script
+# ============================================================================
+# Display Configuration
+# ============================================================================
 
-echo ""
 echo "Configuration:"
-echo "  Topology prefix: ${TOPOLOGY_PREFIX}"
-echo "  Topology rule: ${TOPOLOGY_RULE}"
-echo "  Total points: ${N_TOTAL}"
-echo "  Density factor: ${DENSITY_FACTOR}"
-echo "  Iters: ${ITERS}"
-echo "  Plot interval: ${PLOT_INTERVAL}"
-echo "  Output directory: ${GRAPH_DIR}"
-echo "  Dataset: ${DATASET_NAME}"
+echo "  ─────────────────────────────────────────"
+echo "  Topology"
+echo "    Rule:           ${TOPOLOGY_RULE}"
+echo "    Prefix:         ${TOPOLOGY_PREFIX}"
+echo "    Polygon edges:  $(echo -n ${TOPOLOGY_RULE} | wc -c | tr -d ' ')"
+echo ""
+echo "  Evolution"
+echo "    Points:         ${N_TOTAL}"
+echo "    Iterations:     ${ITERS}"
+echo "    Step size:      ${STEP_SIZE}"
+echo "    Tiling layers:  ${TILING_LAYERS}"
+echo ""
+echo "  Visualization"
+echo "    Plot interval:  every ${PLOT_INTERVAL} iterations"
+echo ""
+echo "  Output"
+echo "    Dataset name:   ${DATASET_NAME}"
+echo "    Graph dir:      ${GRAPH_DIR}"
+echo "  ─────────────────────────────────────────"
 echo ""
 
-# Construct dataset name based on topology rule and parameters
-# Note: The Python script will handle the actual dataset name construction
-# This is just for display purposes
-echo "Generating graph representation..."
+# Create output directory
+mkdir -p "${GRAPH_DIR}"
 
-# Build command arguments
+# ============================================================================
+# Build Command Arguments
+# ============================================================================
+
 CMD_ARGS=(
-    --iters "${ITERS}"
-    --plot_interval "${PLOT_INTERVAL}"
     --topology "${TOPOLOGY_RULE}"
     --prefix "${TOPOLOGY_PREFIX}"
+    --N_total "${N_TOTAL}"
+    --iters "${ITERS}"
+    --step_size "${STEP_SIZE}"
+    --tiling_layers "${TILING_LAYERS}"
+    --plot_interval "${PLOT_INTERVAL}"
     --output_dir "${GRAPH_DIR}"
 )
 
-# Add N_total if set (not empty)
-if [ -n "${N_TOTAL}" ]; then
-    CMD_ARGS+=(--N_total "${N_TOTAL}")
+# Add optional seed if set
+if [ -n "${SEED}" ]; then
+    CMD_ARGS+=(--seed "${SEED}")
 fi
 
-# Add density_factor if set (not empty) - only used if N_total is not provided
-if [ -n "${DENSITY_FACTOR}" ]; then
-    CMD_ARGS+=(--density_factor "${DENSITY_FACTOR}")
-fi
+# ============================================================================
+# Run Graph Generation
+# ============================================================================
 
-python ../scripts/01a_graph_generation.py "${CMD_ARGS[@]}"
+echo "Starting graph generation..."
+echo ""
+
+python "${SCRIPT_DIR}/../scripts/01a_graph_generation.py" "${CMD_ARGS[@]}"
 
 echo ""
-echo "Graph generation complete!"
+echo "=========================================="
+echo "  Graph Generation Complete!"
+echo "=========================================="
 echo ""
-echo "Graph files saved to: ${GRAPH_DIR}"
-echo "  - A_*_labeled.csv (adjacency matrix with labels)"
-echo "  - A_*.npy (adjacency matrix)"
-echo "  - nodes_*.csv (node information)"
-echo "  - coords_*.csv (3D coordinates)"
-echo "  - coords_*.npy (coordinates)"
-echo "  - distance_matrix_*.npy (shortest path distances)"
-echo "  - graph_info_*.json (metadata)"
+echo "Output files saved to: ${GRAPH_DIR}"
 echo ""
-echo "Next step: Generate random walks with"
-echo "  ./01b_sequence_generation.sh"
+echo "  Data files:"
+echo "    - A_${DATASET_NAME}.npy              (adjacency matrix)"
+echo "    - A_${DATASET_NAME}_labeled.csv      (adjacency with labels)"
+echo "    - nodes_${DATASET_NAME}.csv          (node info: id, degree)"
+echo "    - coords_${DATASET_NAME}.npy         (2D coordinates)"
+echo "    - coords_${DATASET_NAME}.csv         (coordinates CSV)"
+echo "    - distance_matrix_${DATASET_NAME}.npy (shortest paths)"
+echo "    - graph_info_${DATASET_NAME}.json    (metadata)"
+echo ""
+echo "  Visualizations:"
+echo "    - graph_visualization.png            (final graph view)"
+echo "    - evolution_plots/                   (evolution snapshots)"
+echo ""
+echo "Next steps:"
+echo "  1. View evolution: ls ${GRAPH_DIR}/evolution_plots/"
+echo "  2. Check graph info: cat ${GRAPH_DIR}/graph_info_${DATASET_NAME}.json"
+echo "  3. Generate random walks: ./01b_sequence_generation.sh"
 echo ""
