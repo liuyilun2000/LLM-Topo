@@ -81,7 +81,7 @@ else
         echo "Error: Data representation directory not found: $INPUT_DIR"
         echo "Please run appropriate preprocessing step:"
         echo "  - ./03a_pca_analysis.sh (for PCA)"
-        echo "  - ./03c_umap_analysis.sh (for UMAP)"
+        echo "  - ./03d_umap_analysis.sh (for UMAP)"
         exit 1
     fi
     # Check if any relevant files exist
@@ -89,7 +89,7 @@ else
         if [ -z "$(ls -A $INPUT_DIR/*_umap_*d.npz 2>/dev/null)" ]; then
             if [ "$DATA_TYPE" = "umap" ]; then
                 echo "Error: UMAP results not found in $INPUT_DIR"
-                echo "Please run ./03c_umap_analysis.sh first"
+                echo "Please run ./03d_umap_analysis.sh first"
                 exit 1
             fi
         fi

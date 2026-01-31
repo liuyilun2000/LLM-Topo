@@ -99,6 +99,6 @@ echo "  sparsity_threshold: [0, 0.01] - optional sparsification"
 echo "  target_entropy: auto | float - auto uses log2(n_neighbors)"
 echo ""
 echo "Next step: Apply UMAP dimensionality reduction:"
-echo "  ./03c_umap_analysis.sh (with USE_FUZZY=true)"
+echo "  ./03c_umap_visualize.sh (with USE_FUZZY=true)"
 echo ""
 

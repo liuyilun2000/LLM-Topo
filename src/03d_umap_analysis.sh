@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Apply UMAP and generate dimensionality reduction results
+# Apply UMAP and generate dimensionality reduction results for topology analysis
 #
 # This script applies UMAP (Uniform Manifold Approximation and Projection) to
 # reduce the dimensionality of the token representations. It supports two
@@ -21,8 +21,8 @@ source "${SCRIPT_DIR}/00_config_env.sh"
 # Determine which data to use
 USE_FUZZY="${USE_FUZZY:-true}"
 
-# UMAP parameters
-UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-3}"
+# UMAP parameters (6D default for topology analysis)
+UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-6}"
 UMAP_MIN_DIST="${UMAP_MIN_DIST:-0.2}"
 UMAP_N_NEIGHBORS="${UMAP_N_NEIGHBORS:-20}"
 UMAP_METRIC="${UMAP_METRIC:-cosine}"
@@ -30,7 +30,7 @@ UMAP_RANDOM_STATE="${UMAP_RANDOM_STATE:-42}"  # Set to integer for reproducibili
 
 # Output control flags
 SAVE_UMAP_RESULT="${SAVE_UMAP_RESULT:-true}"
-GENERATE_VISUALIZATIONS="${GENERATE_VISUALIZATIONS:-true}"
+GENERATE_VISUALIZATIONS="${GENERATE_VISUALIZATIONS:-false}"
 
 # Output directory (includes dimensionality)
 OUTPUT_DIR="${OUTPUT_DIR:-${MODEL_DIR}/umap_result_${UMAP_N_COMPONENTS}d}"
@@ -124,4 +124,3 @@ echo ""
 echo "Next step: Run topology analysis with"
 echo "  ./04a_topology_analysis.sh (with INPUT_MODE=data_representation)"
 echo ""
-

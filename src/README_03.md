@@ -4,10 +4,11 @@ This stage applies dimensionality reduction techniques to token representations 
 
 ## Overview
 
-Stage 03 consists of three steps:
+Stage 03 consists of four steps:
 1. **PCA Analysis** (`03a`) - Principal Component Analysis
 2. **Fuzzy Neighborhood** (`03b`) - Compute fuzzy neighborhood distance matrices
-3. **UMAP Analysis** (`03c`) - Uniform Manifold Approximation and Projection
+3. **UMAP Visualization** (`03c`) - UMAP with 3D default for visualization
+4. **UMAP Analysis** (`03d`) - UMAP with 6D default for topology analysis
 
 ## Step 1: PCA Analysis
 
@@ -133,29 +134,61 @@ N_NEIGHBORS=800 METRIC=cosine ./03b_fuzzy_neighborhood.sh
 N_NEIGHBORS=200 METRIC=euclidean ./03b_fuzzy_neighborhood.sh
 ```
 
-## Step 3: UMAP Analysis
+## Step 3: UMAP Visualization
 
-Apply UMAP for further dimensionality reduction and visualization.
+Apply UMAP for 3D visualization (2D/3D scatter plots).
 
-### Script: `03c_umap_analysis.sh`
+### Script: `03c_umap_visualize.sh`
 
 ```bash
-./03c_umap_analysis.sh
+./03c_umap_visualize.sh
 ```
 
 ### Configuration
 
 ```bash
-# Use fuzzy distance matrices (recommended)
-USE_FUZZY=true UMAP_N_COMPONENTS=6 ./03c_umap_analysis.sh
+# Use fuzzy distance matrices (default: 3D with visualizations)
+USE_FUZZY=true ./03c_umap_visualize.sh
 
 # Use regular PCA
-USE_FUZZY=false UMAP_N_COMPONENTS=3 ./03c_umap_analysis.sh
+USE_FUZZY=false UMAP_N_COMPONENTS=3 ./03c_umap_visualize.sh
 ```
 
 **Parameters:**
 - `USE_FUZZY` - Use fuzzy distance matrices (default: true)
-- `USE_DOWNSAMPLED` - Use downsampled PCA (default: false)
+- `FUZZY_DIR` - Fuzzy neighborhood directory (default: `results/{DATASET_NAME}/{RUN_NAME}/fuzzy_neighborhood`)
+- `PCA_DIR` - PCA directory (default: `results/{DATASET_NAME}/{RUN_NAME}/pca_result`)
+- `REPRESENTATION_DIR` - Representation directory (default: `results/{DATASET_NAME}/{RUN_NAME}/token_representations`)
+- `OUTPUT_DIR` - Output directory (default: `results/{DATASET_NAME}/{RUN_NAME}/umap_result_{n}d`)
+- `UMAP_N_COMPONENTS` - Target dimensions (default: 3)
+- `UMAP_MIN_DIST` - Minimum distance (default: 0.2)
+- `UMAP_N_NEIGHBORS` - Number of neighbors (default: 20)
+- `UMAP_METRIC` - Distance metric (default: cosine)
+- `SAVE_UMAP_RESULT` - Save UMAP embeddings (default: true)
+- `GENERATE_VISUALIZATIONS` - Generate plots (default: true)
+
+## Step 4: UMAP Analysis
+
+Apply UMAP for higher-dimensional embeddings (6D default) for topology analysis.
+
+### Script: `03d_umap_analysis.sh`
+
+```bash
+./03d_umap_analysis.sh
+```
+
+### Configuration
+
+```bash
+# Use fuzzy distance matrices (recommended, 6D for topology)
+USE_FUZZY=true UMAP_N_COMPONENTS=6 ./03d_umap_analysis.sh
+
+# Use regular PCA
+USE_FUZZY=false UMAP_N_COMPONENTS=6 ./03d_umap_analysis.sh
+```
+
+**Parameters:**
+- `USE_FUZZY` - Use fuzzy distance matrices (default: true)
 - `FUZZY_DIR` - Fuzzy neighborhood directory (default: `results/{DATASET_NAME}/{RUN_NAME}/fuzzy_neighborhood`)
 - `PCA_DIR` - PCA directory (default: `results/{DATASET_NAME}/{RUN_NAME}/pca_result`)
 - `REPRESENTATION_DIR` - Representation directory (default: `results/{DATASET_NAME}/{RUN_NAME}/token_representations`)
@@ -195,22 +228,15 @@ Generated in `results/{DATASET_NAME}/{RUN_NAME}/umap_result_{n}d/`:
 ### Example
 
 ```bash
-# 3D visualization
-USE_FUZZY=true \
-UMAP_N_COMPONENTS=3 \
-GENERATE_VISUALIZATIONS=true \
-./03c_umap_analysis.sh
+# 3D visualization (03c)
+./03c_umap_visualize.sh
 
-# 6D for topology analysis
-USE_FUZZY=true \
-UMAP_N_COMPONENTS=6 \
-./03c_umap_analysis.sh
+# 6D for topology analysis (03d)
+./03d_umap_analysis.sh
 
 # Regular PCA (no fuzzy)
-USE_FUZZY=false \
-UMAP_N_COMPONENTS=3 \
-UMAP_METRIC=cosine \
-./03c_umap_analysis.sh
+USE_FUZZY=false UMAP_N_COMPONENTS=3 ./03c_umap_visualize.sh
+USE_FUZZY=false UMAP_N_COMPONENTS=6 ./03d_umap_analysis.sh
 ```
 
 ## Complete Stage 03 Workflow
@@ -222,8 +248,11 @@ PCA_VARIANCE=0.95 ./03a_pca_analysis.sh
 # 2. Fuzzy neighborhood
 N_NEIGHBORS=200 METRIC=cosine ./03b_fuzzy_neighborhood.sh
 
-# 3. UMAP analysis
-USE_FUZZY=true UMAP_N_COMPONENTS=6 ./03c_umap_analysis.sh
+# 3. UMAP visualization (3D)
+./03c_umap_visualize.sh
+
+# 4. UMAP analysis (6D for topology)
+USE_FUZZY=true UMAP_N_COMPONENTS=6 ./03d_umap_analysis.sh
 ```
 
 ## Output Structure

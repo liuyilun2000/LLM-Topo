@@ -35,14 +35,14 @@
 
 # Select topology (uncomment one or set via environment variable)
 # export TOPOLOGY_RULE=${TOPOLOGY_RULE:-"abAB"}        # Torus (default)
-export TOPOLOGY_RULE=${TOPOLOGY_RULE:-"abABcdCD"}      # Double Torus (genus 2)
-# export TOPOLOGY_RULE=${TOPOLOGY_RULE:-"abABcdCDefEF"} # Triple Torus (genus 3)
+# export TOPOLOGY_RULE=${TOPOLOGY_RULE:-"abABcdCD"}      # Double Torus (genus 2)
+export TOPOLOGY_RULE=${TOPOLOGY_RULE:-"abABcdCDefEF"} # Triple Torus (genus 3)
 # export TOPOLOGY_RULE=${TOPOLOGY_RULE:-"abAb"}        # Klein Bottle
 # export TOPOLOGY_RULE=${TOPOLOGY_RULE:-"abab"}        # Projective Plane
 
 # Topology prefix for dataset naming (auto-detected if not set)
 # Will be automatically detected from TOPOLOGY_RULE if not specified
-export TOPOLOGY_PREFIX=${TOPOLOGY_PREFIX:-""}
+export TOPOLOGY_PREFIX=${TOPOLOGY_PREFIX:-"torus"}
 
 # ============================================================================
 # EVOLUTION PARAMETERS
@@ -53,7 +53,7 @@ export TOPOLOGY_PREFIX=${TOPOLOGY_PREFIX:-""}
 # Number of points to sample on the manifold
 # More points = finer graph resolution but slower computation
 # Recommended: 200-500 for testing, 800-2000 for production
-export N_TOTAL=${N_TOTAL:-400}
+export N_TOTAL=${N_TOTAL:-1200}
 
 # Number of evolution iterations for point distribution
 # More iterations = better uniformity but longer runtime

@@ -4,7 +4,7 @@
 # Run Full Analysis Pipeline for Multiple Checkpoints (Parallel Execution)
 # ============================================================================
 #
-# This script runs the full analysis pipeline (12b, 03a, 03b, 03c, 03d, 04a, 04b)
+# This script runs the full analysis pipeline (12b, 03a, 03b, 03c_visualize, 03d_analysis, 04a, 04b)
 # for multiple specified checkpoints in parallel.
 #
 # Usage:
@@ -204,21 +204,21 @@ run_checkpoint_analysis() {
         fi
         echo "[$checkpoint_name] ✓ Fuzzy Neighborhood complete"
         
-        # Step 3: UMAP Analysis
-        echo "[$checkpoint_name] Step 3/7: UMAP Analysis..."
-        if ! ./03c_umap_analysis.sh >> "$log_file" 2>&1; then
-            echo "[$checkpoint_name] ERROR: UMAP analysis failed" | tee -a "$log_file"
-            return 1
-        fi
-        echo "[$checkpoint_name] ✓ UMAP Analysis complete"
-        
-        # Step 4: UMAP Visualization
-        echo "[$checkpoint_name] Step 4/7: UMAP Visualization..."
-        if ! ./03d_umap_visualize.sh >> "$log_file" 2>&1; then
+        # Step 3: UMAP Visualization (3D)
+        echo "[$checkpoint_name] Step 3/7: UMAP Visualization..."
+        if ! ./03c_umap_visualize.sh >> "$log_file" 2>&1; then
             echo "[$checkpoint_name] ERROR: UMAP visualization failed" | tee -a "$log_file"
             return 1
         fi
         echo "[$checkpoint_name] ✓ UMAP Visualization complete"
+        
+        # Step 4: UMAP Analysis (6D for topology)
+        echo "[$checkpoint_name] Step 4/7: UMAP Analysis..."
+        if ! ./03d_umap_analysis.sh >> "$log_file" 2>&1; then
+            echo "[$checkpoint_name] ERROR: UMAP analysis failed" | tee -a "$log_file"
+            return 1
+        fi
+        echo "[$checkpoint_name] ✓ UMAP Analysis complete"
         
         # Step 5: Topology Analysis
         echo "[$checkpoint_name] Step 5/7: Topology Analysis..."

@@ -112,7 +112,7 @@ echo "Step 3.2: Fuzzy Neighborhood..."
 
 echo ""
 echo "Step 3.3: UMAP Analysis..."
-./03c_umap_analysis.sh
+./03d_umap_analysis.sh
 
 echo ""
 echo "✓ Stage 03 Complete: Dimensionality Reduction"

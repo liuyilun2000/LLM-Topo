@@ -59,7 +59,8 @@ cd src/
 # Stage 03: Dimensionality reduction
 ./03a_pca_analysis.sh
 ./03b_fuzzy_neighborhood.sh
-./03c_umap_analysis.sh
+./03c_umap_visualize.sh
+./03d_umap_analysis.sh
 
 # Stage 04: Topology analysis
 ./04a_topology_analysis.sh
@@ -123,7 +124,8 @@ LLM-Topo/
 │   ├── 02b_representation_extraction.sh  # Stage 02: Extract representations
 │   ├── 03a_pca_analysis.sh           # Stage 03: PCA analysis
 │   ├── 03b_fuzzy_neighborhood.sh      # Stage 03: Fuzzy neighborhood
-│   ├── 03c_umap_analysis.sh           # Stage 03: UMAP analysis
+│   ├── 03c_umap_visualize.sh          # Stage 03: UMAP visualization (3D)
+│   ├── 03d_umap_analysis.sh           # Stage 03: UMAP analysis (6D for topology)
 │   ├── 04a_topology_analysis.sh       # Stage 04: Persistent homology
 │   ├── 04b_persistence_barcode.sh    # Stage 04: Barcode visualization
 │   │

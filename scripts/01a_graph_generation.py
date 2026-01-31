@@ -50,6 +50,41 @@ from shapely.geometry import Polygon as ShapelyPolygon, Point
 
 
 # =============================================================================
+# Visualization: Polygon edge palette and arrow styling
+# =============================================================================
+# Official matplotlib tab20 palette - 20 distinct colors (supports up to 16 gluing pairs)
+def _get_cmap(name: str = 'tab20'):
+    """Get colormap (compatible with matplotlib 3.7+)."""
+    try:
+        return plt.colormaps[name]
+    except (AttributeError, TypeError):
+        return plt.cm.get_cmap(name)
+
+
+def _get_edge_palette(n: int = 16) -> List:
+    """Get n distinct colors from tab20 colormap (official matplotlib qualitative)."""
+    cmap = _get_cmap('tab20')
+    return [cmap(i / 19) for i in range(min(n, 20))]
+
+
+def _get_node_palette(n: int) -> np.ndarray:
+    """Get index-based colors for n nodes (continuous viridis, for BFS-ordered coloring)."""
+    cmap = _get_cmap('viridis')
+    if n <= 1:
+        return np.array([cmap(0.5)] * n) if n else np.zeros((0, 4))
+    return np.array([cmap(i / (n - 1)) for i in range(n)])
+
+ARROW_SCALE = 0.12      # Arrow shaft length (fraction of plot scale)
+ARROW_HEAD_SCALE = 18   # Arrow head size (mutation_scale)
+EDGE_LABEL_OFFSET = 0.05   # Label offset from edge, outer side (fraction of plot scale)
+
+# Marker sizes: smaller when tiled view (many points)
+MARKER_MAIN = 32       # Main points, fundamental domain only
+MARKER_MAIN_TILED = 20  # Main points when tiling shown
+MARKER_TILED_COPY = 10  # Duplicated/tiled copies
+
+
+# =============================================================================
 # Configuration
 # =============================================================================
 
@@ -474,6 +509,29 @@ class FundamentalPolygon:
         return np.array([[radius * cos(a), radius * sin(a)] for a in angles])
 
     @staticmethod
+    def _get_edge_directions(rule_str: str) -> List[bool]:
+        """
+        Get arrow direction for each edge from gluing rule.
+        Returns list of bool: True = reversed (uppercase, arrow p1->p0), False = forward (p0->p1).
+        E.g. abABcdCD -> [False,False,True,True,False,False,True,True]
+        """
+        tokens = re.findall(r"([a-zA-Z])", rule_str)
+        return [char.isupper() for char in tokens]
+
+    @staticmethod
+    def _get_edge_labels(rule_str: str) -> List[str]:
+        """
+        Get labels for each edge: lowercase -> "a", uppercase -> "a⁻¹" (Unicode superscript).
+        Plain text so fontweight='bold' works (LaTeX ignores it).
+        """
+        tokens = re.findall(r"([a-zA-Z])", rule_str)
+        labels = []
+        for char in tokens:
+            letter = char.lower()
+            labels.append(f"{letter}⁻¹" if char.isupper() else letter)
+        return labels
+
+    @staticmethod
     def _parse_topology(rule_str: str) -> List[Tuple[int, int, int]]:
         """
         Parse topology string into gluing rules.
@@ -711,39 +769,65 @@ class FundamentalPolygon:
                 ax.plot(tiled_closed[:, 0], tiled_closed[:, 1],
                        color='gray', lw=0.5, alpha=0.3)
 
-            # Draw tiled points (faded)
+            # Draw tiled points (faded, small markers)
             ax.scatter(tiled_pts[len(self.points):, 0],
                       tiled_pts[len(self.points):, 1],
-                      s=8, c='lightgray', alpha=0.4, zorder=2)
+                      s=MARKER_TILED_COPY, c='lightgray', alpha=0.4, zorder=2)
 
         # Draw main polygon (bold)
         poly_closed = np.vstack([self.polygon, self.polygon[0]])
         ax.plot(poly_closed[:, 0], poly_closed[:, 1], 'k-', lw=2, zorder=4)
 
-        # Color edges by gluing pairs
-        if self.gluing_rules:
-            colors = plt.cm.tab10(np.linspace(0, 1, len(self.gluing_rules)))
+        # Color edges by gluing pairs with arrows and letter labels (always shown)
+        if self.gluing_rules and self.topology_rule:
+            edge_is_reversed = self._get_edge_directions(self.topology_rule)
+            edge_labels = self._get_edge_labels(self.topology_rule)
+            colors = _get_edge_palette(len(self.gluing_rules))
+            arrow_len = ARROW_SCALE * max(self.polygon.max() - self.polygon.min(), 1.0)
+            label_offset = EDGE_LABEL_OFFSET * max(self.polygon.max() - self.polygon.min(), 1.0)
+            arrow_props = dict(arrowstyle='->', color='k', lw=2.5,
+                              mutation_scale=ARROW_HEAD_SCALE)
+            centroid = self.polygon.mean(axis=0)
             for idx, (e1, e2, orient) in enumerate(self.gluing_rules):
                 color = colors[idx]
 
-                # Draw edges with arrows to show direction
+                # Draw edges with arrows and labels per gluing rule
                 for edge_idx, is_first in [(e1, True), (e2, False)]:
                     p0 = self.polygon[edge_idx]
                     p1 = self.polygon[(edge_idx + 1) % len(self.polygon)]
                     style = '-' if is_first else '--'
                     ax.plot([p0[0], p1[0]], [p0[1], p1[1]],
-                           color=color, lw=3, alpha=0.8, linestyle=style, zorder=4)
+                           color=color, lw=3.5, alpha=0.9, linestyle=style, zorder=4)
 
-                    # Add arrow showing edge direction
                     mid = (p0 + p1) / 2
-                    direction = (p1 - p0)
-                    direction = direction / np.linalg.norm(direction) * 0.05
-                    ax.annotate('', xy=mid + direction, xytext=mid - direction,
-                               arrowprops=dict(arrowstyle='->', color=color, lw=1.5),
-                               zorder=5)
+                    edge_vec = p1 - p0
+                    norm = np.linalg.norm(edge_vec)
 
-        # Draw main points (bold)
-        ax.scatter(self.points[:, 0], self.points[:, 1], s=25, c='blue',
+                    # Arrow: always drawn
+                    if norm > 1e-10:
+                        direction = (p1 - p0) if not edge_is_reversed[edge_idx] else (p0 - p1)
+                        direction = direction / np.linalg.norm(direction) * arrow_len
+                        ax.annotate('', xy=mid + direction, xytext=mid - direction,
+                                   arrowprops={**arrow_props, 'color': color},
+                                   zorder=5)
+
+                    # Letter label: offset outward (away from centroid), closer to edge, bold
+                    if norm > 1e-10 and edge_idx < len(edge_labels):
+                        to_center = centroid - mid
+                        outward = to_center - np.dot(to_center, edge_vec / norm) * (edge_vec / norm)
+                        out_norm = np.linalg.norm(outward)
+                        if out_norm > 1e-10:
+                            outward = -outward / out_norm * label_offset  # negate: outward from polygon
+                        else:
+                            outward = np.array([edge_vec[1], -edge_vec[0]]) / norm * label_offset
+                        label_xy = mid + outward
+                        ax.text(label_xy[0], label_xy[1], edge_labels[edge_idx],
+                               fontsize=11, ha='center', va='center', color=color,
+                               fontweight='bold', zorder=5)
+
+        # Draw main points (smaller when tiling to reduce clutter)
+        marker_main = MARKER_MAIN_TILED if (show_tiling and self.topology) else 25
+        ax.scatter(self.points[:, 0], self.points[:, 1], s=marker_main, c='blue',
                   alpha=0.8, zorder=6, edgecolors='darkblue', linewidths=0.5)
 
         # Set axis limits with padding
@@ -828,17 +912,21 @@ class FundamentalPolygon:
     def save_graph_visualization(self, edges: List[Tuple[int, int]], path: str):
         """
         Save visualization of the final graph showing edges and boundary crossings.
+        Nodes are colored by BFS index (same palette for both panels; tiled copies at 50% alpha).
 
         Args:
-            edges: List of edge tuples
+            edges: List of edge tuples (indices refer to self.points after BFS reorder)
             path: Output file path
         """
-        fig, axes = plt.subplots(1, 2, figsize=(20, 10))
+        n = len(self.points)
+        node_colors = _get_node_palette(n)
+
+        fig, axes = plt.subplots(1, 2, figsize=(30, 15))
 
         for ax_idx, (ax, show_tiling) in enumerate(zip(axes, [False, True])):
             # Draw tiled space if requested
             if show_tiling and self.topology:
-                tiled_pts, _ = self.topology.create_tiled_points(self.points)
+                tiled_pts, orig_idx = self.topology.create_tiled_points(self.points)
 
                 # Draw tiled polygon copies
                 for T in self.topology.tiling_transforms[1:]:
@@ -847,56 +935,118 @@ class FundamentalPolygon:
                     ax.plot(tiled_closed[:, 0], tiled_closed[:, 1],
                            color='gray', lw=0.5, alpha=0.3)
 
-                # Draw tiled points
-                ax.scatter(tiled_pts[len(self.points):, 0],
-                          tiled_pts[len(self.points):, 1],
-                          s=10, c='lightgray', alpha=0.4, zorder=2)
+                # Draw tiled copies: index-based palette at 20% transparency
+                tiled_copy_colors = np.array([
+                    (*node_colors[orig_idx[i]][:3], 0.2)
+                    for i in range(n, len(tiled_pts))
+                ])
+                ax.scatter(tiled_pts[n:, 0], tiled_pts[n:, 1],
+                          s=MARKER_TILED_COPY, c=tiled_copy_colors, zorder=2)
 
                 # Draw edges including cross-boundary ones
+                # For each edge (u,v), find the correct tiled copy to connect to:
+                # the copy of v closest to u (Voronoi neighbor in tiled space)
+                identity_T = self.topology.tiling_transforms[0]
                 for u, v in edges:
-                    p1, p2 = self.points[u], self.points[v]
-                    dist = np.linalg.norm(p2 - p1)
-
-                    # Check if edge likely crosses boundary (long in fundamental domain)
-                    avg_edge_len = np.mean([np.linalg.norm(self.points[e[1]] - self.points[e[0]])
-                                           for e in edges[:min(50, len(edges))]])
-                    crosses_boundary = dist > 3 * avg_edge_len
-
+                    p_u, p_v = self.points[u], self.points[v]
+                    # Find best copy of v relative to u (min distance = Voronoi neighbor)
+                    best_dist = float('inf')
+                    best_p_v = p_v
+                    best_T = None
+                    for T in self.topology.tiling_transforms:
+                        p_v_tiled = T.apply(p_v)
+                        d = np.linalg.norm(p_v_tiled - p_u)
+                        if d < best_dist:
+                            best_dist = d
+                            best_p_v = p_v_tiled
+                            best_T = T
+                    # Red when edge crosses boundary (best copy is not identity)
+                    crosses_boundary = best_T is not identity_T
                     if crosses_boundary:
-                        # Find the tiled version that's closer
-                        for T in self.topology.tiling_transforms[1:]:
-                            p2_tiled = T.apply(p2)
-                            if np.linalg.norm(p2_tiled - p1) < dist:
-                                ax.plot([p1[0], p2_tiled[0]], [p1[1], p2_tiled[1]],
-                                       'r-', lw=0.8, alpha=0.6, zorder=3)
-                                break
+                        ax.plot([p_u[0], best_p_v[0]], [p_u[1], best_p_v[1]],
+                               'r-', lw=0.8, alpha=0.6, zorder=3)
                     else:
-                        ax.plot([p1[0], p2[0]], [p1[1], p2[1]],
-                               'b-', lw=0.5, alpha=0.5, zorder=3)
+                        ax.plot([p_u[0], best_p_v[0]], [p_u[1], best_p_v[1]],
+                               color='black', lw=0.4, alpha=0.5, zorder=3)
             else:
-                # Draw edges in fundamental domain only
-                for u, v in edges:
-                    p1, p2 = self.points[u], self.points[v]
-                    ax.plot([p1[0], p2[0]], [p1[1], p2[1]],
-                           'b-', lw=0.5, alpha=0.5, zorder=3)
+                # Draw edges in fundamental domain: red for cross-boundary, black for intra-domain
+                if self.topology:
+                    identity_T = self.topology.tiling_transforms[0]
+                    for u, v in edges:
+                        p_u, p_v = self.points[u], self.points[v]
+                        best_T = None
+                        best_dist = float('inf')
+                        for T in self.topology.tiling_transforms:
+                            p_v_tiled = T.apply(p_v)
+                            d = np.linalg.norm(p_v_tiled - p_u)
+                            if d < best_dist:
+                                best_dist = d
+                                best_T = T
+                        crosses_boundary = best_T is not identity_T
+                        if crosses_boundary:
+                            ax.plot([p_u[0], p_v[0]], [p_u[1], p_v[1]],
+                                   'r-', lw=0.8, alpha=0.6, zorder=3)
+                        else:
+                            ax.plot([p_u[0], p_v[0]], [p_u[1], p_v[1]],
+                                   color='black', lw=0.5, alpha=0.5, zorder=3)
+                else:
+                    for u, v in edges:
+                        p1, p2 = self.points[u], self.points[v]
+                        ax.plot([p1[0], p2[0]], [p1[1], p2[1]],
+                               color='black', lw=0.5, alpha=0.5, zorder=3)
 
-            # Draw main polygon
+            # Draw main polygon (thinner on right/tiled view)
             poly_closed = np.vstack([self.polygon, self.polygon[0]])
-            ax.plot(poly_closed[:, 0], poly_closed[:, 1], 'k-', lw=2, zorder=4)
+            poly_lw = 0.8 if show_tiling else 2
+            ax.plot(poly_closed[:, 0], poly_closed[:, 1], 'k-', lw=poly_lw, zorder=4)
 
-            # Color edges by gluing
-            if self.gluing_rules:
-                colors = plt.cm.tab10(np.linspace(0, 1, len(self.gluing_rules)))
+            # Color edges by gluing with arrows and letter labels (always shown)
+            if self.gluing_rules and self.topology_rule:
+                edge_is_reversed = self._get_edge_directions(self.topology_rule)
+                edge_labels = self._get_edge_labels(self.topology_rule)
+                colors = _get_edge_palette(len(self.gluing_rules))
+                arrow_len = ARROW_SCALE * max(self.polygon.max() - self.polygon.min(), 1.0)
+                label_offset = EDGE_LABEL_OFFSET * max(self.polygon.max() - self.polygon.min(), 1.0)
+                edge_lw = 1.0 if show_tiling else 3.5
+                arrow_lw = 1.2 if show_tiling else 2.5
+                arrow_scale = 10 if show_tiling else ARROW_HEAD_SCALE
+                arrow_props = dict(arrowstyle='->', lw=arrow_lw, mutation_scale=arrow_scale)
+                centroid = self.polygon.mean(axis=0)
                 for idx, (e1, e2, _) in enumerate(self.gluing_rules):
+                    color = colors[idx]
                     for edge in [e1, e2]:
                         p0 = self.polygon[edge]
                         p1 = self.polygon[(edge + 1) % len(self.polygon)]
                         ax.plot([p0[0], p1[0]], [p0[1], p1[1]],
-                               color=colors[idx], lw=3, alpha=0.7, zorder=5)
+                               color=color, lw=edge_lw, alpha=0.9, zorder=5)
+                        mid = (p0 + p1) / 2
+                        edge_vec = p1 - p0
+                        norm = np.linalg.norm(edge_vec)
+                        # Arrow: always drawn
+                        if norm > 1e-10:
+                            direction = (p1 - p0) if not edge_is_reversed[edge] else (p0 - p1)
+                            direction = direction / np.linalg.norm(direction) * arrow_len
+                            ax.annotate('', xy=mid + direction, xytext=mid - direction,
+                                       arrowprops={**arrow_props, 'color': color},
+                                       zorder=6)
+                        # Letter label: offset outward (away from polygon), closer to edge, bold
+                        if norm > 1e-10 and edge < len(edge_labels):
+                            to_center = centroid - mid
+                            outward = to_center - np.dot(to_center, edge_vec / norm) * (edge_vec / norm)
+                            out_norm = np.linalg.norm(outward)
+                            if out_norm > 1e-10:
+                                outward = -outward / out_norm * label_offset  # outward from polygon
+                            else:
+                                outward = np.array([edge_vec[1], -edge_vec[0]]) / norm * label_offset
+                            label_xy = mid + outward
+                            ax.text(label_xy[0], label_xy[1], edge_labels[edge],
+                                   fontsize=11, ha='center', va='center', color=color,
+                                   fontweight='bold', zorder=6)
 
-            # Draw points
-            ax.scatter(self.points[:, 0], self.points[:, 1], s=20, c='blue',
-                      alpha=0.8, zorder=6, edgecolors='darkblue', linewidths=0.5)
+            # Draw main points: index-based palette (smaller when tiled)
+            marker_main = MARKER_MAIN_TILED if show_tiling else MARKER_MAIN
+            ax.scatter(self.points[:, 0], self.points[:, 1], s=marker_main, c=node_colors,
+                      alpha=0.9, zorder=6, edgecolors='black', linewidths=0.2)
 
             ax.set_aspect('equal')
             ax.grid(True, linestyle='--', alpha=0.3)
@@ -904,7 +1054,7 @@ class FundamentalPolygon:
             ax.set_title(f"{title}\n{len(self.points)} nodes, {len(edges)} edges")
 
         plt.tight_layout()
-        plt.savefig(path, dpi=150)
+        plt.savefig(path, dpi=200)
         plt.close()
         print(f"[Graph] Saved visualization to '{path}'")
 
@@ -1132,7 +1282,11 @@ def main():
     if args.topology:
         nodes, edges = poly.build_graph()
 
-        # Save graph visualization before reordering
+        # BFS reorder immediately after graph construction (before visualization and export)
+        nodes, edges, _ = FundamentalPolygon.reorder_by_bfs(nodes, edges)
+        poly.points = nodes  # Update for visualization (nodes now in BFS order)
+
+        # Save graph visualization with BFS-index coloring
         graph_viz_path = os.path.join(args.output_dir, "graph_visualization.png")
         poly.save_graph_visualization(edges, graph_viz_path)
 
@@ -1144,9 +1298,6 @@ def main():
         degrees = [len(adj.get(i, [])) for i in range(len(nodes))]
         print(f"[Graph] Degree distribution: mean={np.mean(degrees):.2f}, "
               f"range=[{min(degrees)}, {max(degrees)}]")
-
-        # Reorder by BFS
-        nodes, edges, _ = FundamentalPolygon.reorder_by_bfs(nodes, edges)
 
         # Determine dataset name
         prefix = args.prefix or detect_topology_name(args.topology)

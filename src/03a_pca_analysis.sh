@@ -69,6 +69,6 @@ echo "Next step options:"
 echo "  1. Compute fuzzy neighborhood distance matrix for persistent homology:"
 echo "     ./03b_fuzzy_neighborhood.sh"
 echo "  2. Apply UMAP dimensionality reduction:"
-echo "     ./03c_umap_analysis.sh"
+echo "     ./03c_umap_visualize.sh"
 echo ""
 

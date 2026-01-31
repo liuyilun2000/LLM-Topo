@@ -267,7 +267,8 @@ After completing all stages:
 # Stage 03: Dimensionality reduction
 ./03a_pca_analysis.sh
 ./03b_fuzzy_neighborhood.sh
-./03c_umap_analysis.sh
+./03c_umap_visualize.sh
+./03d_umap_analysis.sh
 
 # Stage 04: Topology analysis
 ./04a_topology_analysis.sh

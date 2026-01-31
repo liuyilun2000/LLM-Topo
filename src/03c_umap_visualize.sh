@@ -1,17 +1,17 @@
 #!/bin/bash
 
-# Apply UMAP and generate dimensionality reduction results
+# Apply UMAP and generate dimensionality reduction visualizations
 #
 # This script applies UMAP (Uniform Manifold Approximation and Projection) to
-# reduce the dimensionality of the token representations. It supports two
-# input modes:
+# reduce the dimensionality of the token representations and generate 2D/3D
+# visualizations. It supports two input modes:
 #   - Fuzzy neighborhood distance matrices (USE_FUZZY=true) [default]
 #   - Regular PCA data (USE_FUZZY=false)
 
 set -e
 
 echo "=========================================="
-echo "UMAP Analysis"
+echo "UMAP Visualization"
 echo "=========================================="
 
 # Load shared configuration
@@ -21,8 +21,8 @@ source "${SCRIPT_DIR}/00_config_env.sh"
 # Determine which data to use
 USE_FUZZY="${USE_FUZZY:-true}"
 
-# UMAP parameters
-UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-6}"
+# UMAP parameters (3D default for visualization)
+UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-3}"
 UMAP_MIN_DIST="${UMAP_MIN_DIST:-0.2}"
 UMAP_N_NEIGHBORS="${UMAP_N_NEIGHBORS:-20}"
 UMAP_METRIC="${UMAP_METRIC:-cosine}"
@@ -30,7 +30,7 @@ UMAP_RANDOM_STATE="${UMAP_RANDOM_STATE:-42}"  # Set to integer for reproducibili
 
 # Output control flags
 SAVE_UMAP_RESULT="${SAVE_UMAP_RESULT:-true}"
-GENERATE_VISUALIZATIONS="${GENERATE_VISUALIZATIONS:-false}"
+GENERATE_VISUALIZATIONS="${GENERATE_VISUALIZATIONS:-true}"
 
 # Output directory (includes dimensionality)
 OUTPUT_DIR="${OUTPUT_DIR:-${MODEL_DIR}/umap_result_${UMAP_N_COMPONENTS}d}"
@@ -78,7 +78,7 @@ else
     fi
 fi
 
-echo "Applying UMAP..."
+echo "Applying UMAP for visualization..."
 
 if [ "$USE_FUZZY" = "true" ]; then
     python ../scripts/03c_umap_analysis.py \
@@ -108,7 +108,7 @@ fi
 
 echo ""
 echo "=========================================="
-echo "UMAP Analysis complete!"
+echo "UMAP Visualization complete!"
 echo "=========================================="
 echo ""
 echo "Results saved to: $OUTPUT_DIR"
@@ -121,7 +121,8 @@ if [ "$GENERATE_VISUALIZATIONS" = "true" ]; then
     echo "Visualizations saved as: {key}_umap_${UMAP_N_COMPONENTS}d.{png,html}"
 fi
 echo ""
-echo "Next step: Run topology analysis with"
+echo "Next step: Run UMAP analysis (high-dim embeddings) for topology:"
+echo "  ./03d_umap_analysis.sh (with USE_FUZZY=true, UMAP_N_COMPONENTS=6)"
+echo "Then run topology analysis:"
 echo "  ./04a_topology_analysis.sh (with INPUT_MODE=data_representation)"
 echo ""
-
