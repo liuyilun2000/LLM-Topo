@@ -23,17 +23,24 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Representation types to extract (default: after_block)
-# Options: residual_before, after_attention, after_block, ffn_gate, ffn_up
-# Multiple can be specified: REPRESENTATIONS="after_block ffn_gate ffn_up"
-REPRESENTATIONS="${REPRESENTATIONS:-after_block ffn_gate ffn_up}"
+# REPRESENTATIONS, REPRESENTATION_UPSEAMPLE, REPRESENTATION_UPSEAMPLE_N, REPRESENTATION_UPSEAMPLE_SEED from 00_config_env.sh
 
 echo ""
 echo "Configuration:"
 echo "  Model: $MODEL_DIR"
 echo "  Output dir: $REPRESENTATION_DIR"
 echo "  Representations: $REPRESENTATIONS"
+echo "  Upsample: $REPRESENTATION_UPSEAMPLE (N=$REPRESENTATION_UPSEAMPLE_N, seed=$REPRESENTATION_UPSEAMPLE_SEED)"
 echo ""
+
+# When upsampling, dataset is required
+if [ "$REPRESENTATION_UPSEAMPLE" = "true" ]; then
+    if [ ! -d "$DATASET_DIR" ]; then
+        echo "Error: Upsampling is enabled but dataset directory $DATASET_DIR not found!"
+        echo "Please run ./01c_dataset_preparation.sh first or set REPRESENTATION_UPSEAMPLE=false"
+        exit 1
+    fi
+fi
 
 # Check if model exists
 if [ ! -d "$MODEL_DIR" ]; then
@@ -56,10 +63,15 @@ if [ -f "$REPRESENTATION_DIR/token_representations.npz" ]; then
 fi
 
 echo "Extracting token representations..."
+EXTRA_ARGS=()
+if [ "$REPRESENTATION_UPSEAMPLE" = "true" ]; then
+    EXTRA_ARGS+=(--upsample --dataset_dir "$DATASET_DIR" --upsample_n "$REPRESENTATION_UPSEAMPLE_N" --seed "$REPRESENTATION_UPSEAMPLE_SEED")
+fi
 python ../scripts/02b_representation_extraction.py \
     --model_dir "$MODEL_DIR" \
     --output_dir "$REPRESENTATION_DIR" \
-    --representations $REPRESENTATIONS
+    --representations $REPRESENTATIONS \
+    "${EXTRA_ARGS[@]}"
 
 echo ""
 echo "=========================================="

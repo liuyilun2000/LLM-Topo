@@ -16,11 +16,7 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Local configuration
-
-# PCA parameters: use either PCA_N_COMPONENTS or PCA_VARIANCE (not both)
-PCA_N_COMPONENTS="${PCA_N_COMPONENTS:-}"
-PCA_VARIANCE="${PCA_VARIANCE:-0.95}"
+# PCA_N_COMPONENTS, PCA_VARIANCE from 00_config_env.sh (use one or the other)
 
 echo ""
 echo "Configuration:"

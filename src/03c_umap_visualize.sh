@@ -18,22 +18,9 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Determine which data to use
-USE_FUZZY="${USE_FUZZY:-true}"
-
-# UMAP parameters (3D default for visualization)
-UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-3}"
-UMAP_MIN_DIST="${UMAP_MIN_DIST:-0.2}"
-UMAP_N_NEIGHBORS="${UMAP_N_NEIGHBORS:-20}"
-UMAP_METRIC="${UMAP_METRIC:-cosine}"
-UMAP_RANDOM_STATE="${UMAP_RANDOM_STATE:-42}"  # Set to integer for reproducibility, empty for random
-
-# Output control flags
-SAVE_UMAP_RESULT="${SAVE_UMAP_RESULT:-true}"
-GENERATE_VISUALIZATIONS="${GENERATE_VISUALIZATIONS:-true}"
-
-# Output directory (includes dimensionality)
-OUTPUT_DIR="${OUTPUT_DIR:-${MODEL_DIR}/umap_result_${UMAP_N_COMPONENTS}d}"
+# USE_FUZZY, UMAP_*, SAVE_UMAP_RESULT, GENERATE_VISUALIZATIONS from 00_config_env.sh (03c uses UMAP_VIS_N_COMPONENTS)
+UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-${UMAP_VIS_N_COMPONENTS}}"
+OUTPUT_DIR="${OUTPUT_DIR:-${UMAP_VIS_RESULT_DIR}}"
 
 echo ""
 echo "Configuration:"

@@ -15,20 +15,10 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Local configuration
+# CONFIG, OUTPUT_DIR, EPOCHS, BATCH_SIZE, GRAD_ACCUM, LEARNING_RATE, MAX_LENGTH, SAVE_STEPS, EVAL_STEPS, LOGGING_STEPS, SAVE_TOTAL_LIMIT, USE_CPU from 00_config_env.sh
 CONFIG="${CONFIG:-configs/config_${RUN_NAME}.json}"
 OUTPUT_DIR="${OUTPUT_DIR:-./${WORK_DIR}}"
-EPOCHS="${EPOCHS:-1}"
-BATCH_SIZE="${BATCH_SIZE:-50}"
-GRAD_ACCUM="${GRAD_ACCUM:-1}"
-LEARNING_RATE="${LEARNING_RATE:-5e-4}"
-MAX_LENGTH="${MAX_LENGTH:-128}"
-SAVE_STEPS="${SAVE_STEPS:-400}"     # should be integer multiple of eval_steps
-EVAL_STEPS="${EVAL_STEPS:-100}"
-LOGGING_STEPS="${LOGGING_STEPS:-10}"
 LOG_DIR="${LOG_DIR:-${OUTPUT_DIR}}"
-SAVE_TOTAL_LIMIT="${SAVE_TOTAL_LIMIT:-all}"  # Number of checkpoints to keep, or "all" to save all
-USE_CPU="${USE_CPU:-false}"
 
 echo ""
 echo "Configuration:"

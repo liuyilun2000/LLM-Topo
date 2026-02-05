@@ -15,23 +15,10 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Variables N, N_TOTAL, ITERS, TOPOLOGY_RULE are loaded from 00_config_env.sh
-# They must match the values used in 01a_graph_generation.sh
-
-# Walk generation parameters
-MAX_LENGTH=${MAX_LENGTH:-128}
-# MAX_SEQS=${MAX_SEQS:-120000}
-MAX_SEQS=${MAX_SEQS:-1200}
-MIN_VISITS_PER_NODE=${MIN_VISITS_PER_NODE:-10000000000}
-NO_REPEAT_WINDOW=${NO_REPEAT_WINDOW:-32}
-RESTART_PROB=${RESTART_PROB:-0}
-TEMPERATURE=${TEMPERATURE:-1}
-SEED=${SEED:-42}
-
-# Variables SEQUENCE_DIR, DATA_DIR, DATASET_NAME are loaded from 00_config_env.sh
+# N_TOTAL, ITERS, TOPOLOGY_RULE, SEQUENCE_DIR, DATA_DIR, DATASET_NAME from 00_config_env.sh
+# Walk parameters: MAX_LENGTH, MAX_SEQS, MIN_VISITS_PER_NODE, NO_REPEAT_WINDOW, RESTART_PROB, TEMPERATURE, SEED from config
 mkdir -p "${SEQUENCE_DIR}"
 
-# Use centralized DATASET_NAME from config
 OUT=${OUT:-${SEQUENCE_DIR}/walks_${DATASET_NAME}.csv}
 COUNTS_OUT=${COUNTS_OUT:-${SEQUENCE_DIR}/visit_counts_${DATASET_NAME}.csv}
 

@@ -24,16 +24,7 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Input mode: "distance_matrix" or "data_representation"
-#  - distance_matrix: Uses fuzzy neighborhood distance matrices
-#  - data_representation: Uses data embeddings (PCA, UMAP, downsampled PCA)
-INPUT_MODE="${INPUT_MODE:-data_representation}"
-
-# Ripser parameters for persistence diagram generation
-RIPSER_THRESH="${RIPSER_THRESH:-}"
-RIPSER_MAXDIM="${RIPSER_MAXDIM:-2}"
-RIPSER_COEFF="${RIPSER_COEFF:-3}"       # Z/kZ 
-
+# INPUT_MODE, RIPSER_*, INPUT_DIR, DATA_TYPE from 00_config_env.sh
 # For distance_matrix mode
 if [ "$INPUT_MODE" = "distance_matrix" ]; then
     INPUT_DIR=""
@@ -41,7 +32,7 @@ if [ "$INPUT_MODE" = "distance_matrix" ]; then
     echo "Input mode: Distance matrix (fuzzy neighborhood distance matrices)"
 # For data_representation mode
 else
-    INPUT_DIR="${INPUT_DIR:-${MODEL_DIR}/umap_result_6d}"
+    INPUT_DIR="${INPUT_DIR:-${TOPOLOGY_UMAP_RESULT_DIR}}"
     # Data type: 'auto' (detect), 'pca', 'umap', or 'downsampled'
     DATA_TYPE="${DATA_TYPE:-auto}"
     echo "Input mode: Data representation (PCA, UMAP, downsampled PCA)"
@@ -54,7 +45,7 @@ echo ""
 echo "Configuration:"
 echo "  Input mode: $INPUT_MODE"
 if [ "$INPUT_MODE" = "distance_matrix" ]; then
-    echo "  Fuzzy dir: $FUZZY_DIR"
+    echo "  Fuzzy dir: $FUZZY_NEIGHBORHOOD_DIR"
 else
     echo "  Data dir: $INPUT_DIR"
     echo "  Data type: $DATA_TYPE"
@@ -71,8 +62,8 @@ echo ""
 
 # Check if results exist
 if [ "$INPUT_MODE" = "distance_matrix" ]; then
-    if [ ! -d "$FUZZY_DIR" ] || [ -z "$(ls -A $FUZZY_DIR/*_fuzzy_dist.npz 2>/dev/null)" ]; then
-        echo "Error: Fuzzy distance matrices not found in $FUZZY_DIR"
+    if [ ! -d "$FUZZY_NEIGHBORHOOD_DIR" ] || [ -z "$(ls -A $FUZZY_NEIGHBORHOOD_DIR/*_fuzzy_dist.npz 2>/dev/null)" ]; then
+        echo "Error: Fuzzy distance matrices not found in $FUZZY_NEIGHBORHOOD_DIR"
         echo "Please run ./03b_fuzzy_neighborhood.sh first"
         exit 1
     fi
@@ -126,7 +117,7 @@ echo "=========================================="
 echo "Persistence diagram generation complete!"
 echo "=========================================="
 echo ""
-echo "Persistence diagrams (PNG) and data (JSON) saved to: $OUTPUT_DIR"
+echo "Persistence diagrams (PNG) and data (JSON) saved to: $TOPOLOGY_ANALYSIS_DIR"
 echo ""
 echo "Next step: Visualize persistence barcodes with"
 echo "  ./04b_persistence_barcode.sh"

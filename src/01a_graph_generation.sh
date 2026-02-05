@@ -18,7 +18,7 @@
 #   - coords_{name}.csv, coords_{name}.npy : 2D coordinates
 #   - distance_matrix_{name}.npy : Shortest path distances
 #   - graph_info_{name}.json : Metadata
-#   - graph_visualization.png : Final graph visualization
+#   - graph_visualization.pdf : Final graph visualization
 #   - evolution_plots/ : Evolution snapshots
 #
 # Usage:
@@ -114,8 +114,8 @@ echo "    - distance_matrix_${DATASET_NAME}.npy (shortest paths)"
 echo "    - graph_info_${DATASET_NAME}.json    (metadata)"
 echo ""
 echo "  Visualizations:"
-echo "    - graph_visualization.png            (final graph view)"
-echo "    - evolution_plots/                   (evolution snapshots)"
+echo "    - graph_visualization.pdf            (final graph view)"
+echo "    - evolution_plots/                   (evolution snapshots, PDF)"
 echo ""
 echo "Next steps:"
 echo "  1. View evolution: ls ${GRAPH_DIR}/evolution_plots/"

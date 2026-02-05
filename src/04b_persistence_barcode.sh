@@ -17,11 +17,7 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Local configuration
-
-# Barcode parameters
-MAX_BARS="${MAX_BARS:-20}"
-TOP_K="${TOP_K:-4}"
+# MAX_BARS and TOP_K are loaded from 00_config_env.sh
 
 echo ""
 echo "Configuration:"

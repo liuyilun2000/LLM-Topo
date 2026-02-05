@@ -18,22 +18,11 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Determine which data to use
-USE_FUZZY="${USE_FUZZY:-true}"
-
-# UMAP parameters (6D default for topology analysis)
-UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-6}"
-UMAP_MIN_DIST="${UMAP_MIN_DIST:-0.2}"
-UMAP_N_NEIGHBORS="${UMAP_N_NEIGHBORS:-20}"
-UMAP_METRIC="${UMAP_METRIC:-cosine}"
-UMAP_RANDOM_STATE="${UMAP_RANDOM_STATE:-42}"  # Set to integer for reproducibility, empty for random
-
-# Output control flags
-SAVE_UMAP_RESULT="${SAVE_UMAP_RESULT:-true}"
+# USE_FUZZY, UMAP_*, SAVE_UMAP_RESULT, GENERATE_VISUALIZATIONS from 00_config_env.sh (03d uses UMAP_TOPOLOGY_N_COMPONENTS)
+UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-${UMAP_TOPOLOGY_N_COMPONENTS}}"
+# 03d typically does not generate 2D/3D plots
 GENERATE_VISUALIZATIONS="${GENERATE_VISUALIZATIONS:-false}"
-
-# Output directory (includes dimensionality)
-OUTPUT_DIR="${OUTPUT_DIR:-${MODEL_DIR}/umap_result_${UMAP_N_COMPONENTS}d}"
+OUTPUT_DIR="${OUTPUT_DIR:-${TOPOLOGY_UMAP_RESULT_DIR}}"
 
 echo ""
 echo "Configuration:"

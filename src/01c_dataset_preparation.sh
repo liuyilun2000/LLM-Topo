@@ -15,10 +15,8 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Local configuration
-# DATASET_NAME is loaded from 00_config_env.sh
+# INPUT_CSV, TRAIN_SPLIT, DATASET_NAME, DATA_DIR, DATASET_DIR from 00_config_env.sh
 INPUT_CSV=${INPUT_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME}.csv}
-TRAIN_SPLIT=${TRAIN_SPLIT:-0.95}
 
 echo ""
 echo "Configuration:"

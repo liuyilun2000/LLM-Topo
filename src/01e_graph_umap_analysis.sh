@@ -18,17 +18,12 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Matrix type: "adjacency" or "distance" (default: auto = prefer distance)
-MATRIX_TYPE="${MATRIX_TYPE:-auto}"
-
-# UMAP parameters (6D default for topology analysis)
-UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-6}"
-UMAP_MIN_DIST="${UMAP_MIN_DIST:-0.2}"
-UMAP_N_NEIGHBORS="${UMAP_N_NEIGHBORS:-200}"
-UMAP_RANDOM_STATE="${UMAP_RANDOM_STATE:-42}"
-
-# Output directory
-OUTPUT_DIR="${OUTPUT_DIR:-./${DATA_DIR}/graph_umap_result_6d}"
+# MATRIX_TYPE, GRAPH_UMAP_* from 00_config_env.sh (topology pipeline uses GRAPH_UMAP_N_COMPONENTS_TOPOLOGY)
+UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-${GRAPH_UMAP_N_COMPONENTS_TOPOLOGY}}"
+UMAP_MIN_DIST="${UMAP_MIN_DIST:-${GRAPH_UMAP_MIN_DIST}}"
+UMAP_N_NEIGHBORS="${UMAP_N_NEIGHBORS:-${GRAPH_UMAP_N_NEIGHBORS}}"
+UMAP_RANDOM_STATE="${UMAP_RANDOM_STATE:-${GRAPH_UMAP_RANDOM_STATE}}"
+OUTPUT_DIR="${OUTPUT_DIR:-${GRAPH_UMAP_TOPOLOGY_RESULT_DIR}}"
 
 echo ""
 echo "Configuration:"

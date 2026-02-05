@@ -736,7 +736,7 @@ class FundamentalPolygon:
                           (k == 0 or k == self.config.iters - 1 or
                            (k + 1) % self.config.plot_interval == 0))
             if should_plot:
-                self._save_plot(os.path.join(plot_dir, f"iter_{k:03d}.png"),
+                self._save_plot(os.path.join(plot_dir, f"iter_{k:03d}.pdf"),
                                f"Iteration {k+1}/{self.config.iters}")
                 print(f"[Evolution] Iter {k+1}: delta={self.metrics.deltas[-1]:.6f}, "
                       f"avg_nn_dist={self.metrics.avg_distances[-1]:.4f}")
@@ -846,7 +846,7 @@ class FundamentalPolygon:
                     f"{len(self.topology.tiling_transforms) if self.topology else 1} tiles)")
 
         plt.tight_layout()
-        plt.savefig(path, dpi=150)
+        plt.savefig(path, format='pdf', dpi=150)
         plt.close()
 
     def build_graph(self) -> Tuple[np.ndarray, List[Tuple[int, int]]]:
@@ -1054,7 +1054,7 @@ class FundamentalPolygon:
             ax.set_title(f"{title}\n{len(self.points)} nodes, {len(edges)} edges")
 
         plt.tight_layout()
-        plt.savefig(path, dpi=200)
+        plt.savefig(path, format='pdf', dpi=200)
         plt.close()
         print(f"[Graph] Saved visualization to '{path}'")
 
@@ -1287,7 +1287,7 @@ def main():
         poly.points = nodes  # Update for visualization (nodes now in BFS order)
 
         # Save graph visualization with BFS-index coloring
-        graph_viz_path = os.path.join(args.output_dir, "graph_visualization.png")
+        graph_viz_path = os.path.join(args.output_dir, "graph_visualization.pdf")
         poly.save_graph_visualization(edges, graph_viz_path)
 
         # Print degree statistics

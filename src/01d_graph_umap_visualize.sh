@@ -22,15 +22,14 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
+# WALKS_CSV, MATRIX_TYPE, GRAPH_UMAP_*, TRAJECTORY_IDX, MAX_LENGTH from 00_config_env.sh
 WALKS_CSV="${WALKS_CSV:-./${DATA_DIR}/sequences/walks_${DATASET_NAME}.csv}"
-MATRIX_TYPE="${MATRIX_TYPE:-auto}"
 WALK_ID="${WALK_ID:-}"
-TRAJECTORY_IDX="${TRAJECTORY_IDX:-128}"
-UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-3}"
-UMAP_MIN_DIST="${UMAP_MIN_DIST:-0.2}"
-UMAP_N_NEIGHBORS="${UMAP_N_NEIGHBORS:-200}"
-UMAP_RANDOM_STATE="${UMAP_RANDOM_STATE:-42}"
-MAX_LENGTH="${MAX_LENGTH:-128}"
+# Use graph 3D UMAP defaults from config
+UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-${GRAPH_UMAP_N_COMPONENTS_3D}}"
+UMAP_MIN_DIST="${UMAP_MIN_DIST:-${GRAPH_UMAP_MIN_DIST}}"
+UMAP_N_NEIGHBORS="${UMAP_N_NEIGHBORS:-${GRAPH_UMAP_N_NEIGHBORS}}"
+UMAP_RANDOM_STATE="${UMAP_RANDOM_STATE:-${GRAPH_UMAP_RANDOM_STATE}}"
 OUTPUT_DIR="${OUTPUT_DIR:-./${DATA_DIR}/graph_umap_visualize}"
 
 echo ""
@@ -39,7 +38,7 @@ echo "  Graph dir: $GRAPH_DIR"
 echo "  Dataset: $DATASET_NAME"
 echo "  Matrix type: $MATRIX_TYPE"
 echo "  Walks CSV: $WALKS_CSV"
-[ -n "$WALK_ID" ] && echo "  Walk ID: $WALK_ID" || echo "  Trajectory index: $TRAJECTORY_IDX"
+[ -n "$WALK_ID" ] && echo "  Walk ID: $WALK_ID" || echo "  Trajectory index: ${TRAJECTORY_IDX}"
 echo "  Output dir: $OUTPUT_DIR"
 echo "  UMAP: ${UMAP_N_COMPONENTS}D, min_dist=$UMAP_MIN_DIST, n_neighbors=$UMAP_N_NEIGHBORS"
 echo ""
@@ -87,7 +86,7 @@ PYTHON_ARGS=(
     --max_length "$MAX_LENGTH"
     --generate_visualizations
 )
-[ -n "$WALK_ID" ] && PYTHON_ARGS+=(--walk_id "$WALK_ID") || PYTHON_ARGS+=(--trajectory_idx "$TRAJECTORY_IDX")
+[ -n "$WALK_ID" ] && PYTHON_ARGS+=(--walk_id "$WALK_ID") || PYTHON_ARGS+=(--trajectory_idx "${TRAJECTORY_IDX}")
 
 python ../scripts/01d_graph_umap_visualize.py "${PYTHON_ARGS[@]}"
 

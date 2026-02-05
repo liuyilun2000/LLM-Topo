@@ -18,22 +18,14 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Input: UMAP graph results from 01e
-INPUT_DIR="${INPUT_DIR:-./${DATA_DIR}/graph_umap_result_6d}"
-DATA_TYPE="${DATA_TYPE:-umap}"
-
-# Output directory
+# INPUT_DIR, OUTPUT_DIR, DATA_TYPE, RIPSER_* from 00_config_env.sh
+INPUT_DIR="${INPUT_DIR:-${GRAPH_UMAP_TOPOLOGY_RESULT_DIR}}"
 OUTPUT_DIR="${OUTPUT_DIR:-./${DATA_DIR}/graph_topology}"
-
-# Ripser parameters
-RIPSER_THRESH="${RIPSER_THRESH:-}"
-RIPSER_MAXDIM="${RIPSER_MAXDIM:-2}"
-RIPSER_COEFF="${RIPSER_COEFF:-3}"
 
 echo ""
 echo "Configuration:"
 echo "  Input dir (graph UMAP): $INPUT_DIR"
-echo "  Data type: $DATA_TYPE"
+echo "  Data type: ${DATA_TYPE:-umap}"
 echo "  Output dir: $OUTPUT_DIR"
 echo "  Ripser maxdim: $RIPSER_MAXDIM"
 echo "  Ripser coeff: Z$RIPSER_COEFF"
@@ -66,7 +58,7 @@ RIPSER_ARGS="$RIPSER_ARGS --ripser_coeff $RIPSER_COEFF"
 python ../scripts/04a_topology_analysis.py \
     --data_dir "$INPUT_DIR" \
     --output_dir "$OUTPUT_DIR" \
-    --data_type "$DATA_TYPE" \
+    --data_type "${DATA_TYPE:-umap}" \
     $RIPSER_ARGS
 
 echo ""

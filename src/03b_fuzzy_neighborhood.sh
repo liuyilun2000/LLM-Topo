@@ -38,13 +38,7 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# Fuzzy neighborhood parameters
-N_NEIGHBORS="${N_NEIGHBORS:-20}"
-METRIC="${METRIC:-cosine}"
-SYM_METHOD="${SYM_METHOD:-fuzzy_union}"
-EPSILON="${EPSILON:-1e-10}"
-SPARSITY_THRESHOLD="${SPARSITY_THRESHOLD:-0.0}"
-TARGET_ENTROPY="${TARGET_ENTROPY:-auto}"
+# N_NEIGHBORS, METRIC, SYM_METHOD, EPSILON, SPARSITY_THRESHOLD, TARGET_ENTROPY from 00_config_env.sh
 
 echo ""
 echo "Configuration:"

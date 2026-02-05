@@ -22,9 +22,7 @@ source "${SCRIPT_DIR}/00_config_env.sh"
 TOPOLOGY_DIR="${TOPOLOGY_DIR:-./${DATA_DIR}/graph_topology}"
 OUTPUT_DIR="${OUTPUT_DIR:-./${DATA_DIR}/graph_persistence_barcode}"
 
-# Barcode parameters
-MAX_BARS="${MAX_BARS:-20}"
-TOP_K="${TOP_K:-8}"
+# MAX_BARS and TOP_K are loaded from 00_config_env.sh
 
 echo ""
 echo "Configuration:"

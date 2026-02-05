@@ -3,6 +3,11 @@ Extract and save internal representations for each token
 - Hidden states at different points in the architecture
 - FFN activations at each layer
 
+When upsampling is enabled: for each token, sample N sequences from the dataset
+that contain that token, extract the representation at the token's position in
+each sequence; save the average-pooled vector as the main representation (same
+naming as non-upsampled) and save the N raw vectors for visualization.
+
 Supported representation types:
 - 'residual_before': Residual stream state before each decoder block (input to block)
 - 'after_attention': Hidden state after attention, before FFN
@@ -12,6 +17,7 @@ Supported representation types:
 """
 import argparse
 import json
+import random
 import torch
 import numpy as np
 from pathlib import Path
@@ -19,6 +25,7 @@ from tqdm import tqdm
 from collections import defaultdict
 
 from transformers import LlamaForCausalLM
+from datasets import load_from_disk
 
 
 class RepresentationExtractor:
@@ -160,6 +167,75 @@ def extract_token_representations(model, token_id, representations=None):
     return token_reps
 
 
+def extract_token_representations_from_sequence(model, sequence_token_ids, target_position, representations=None):
+    """
+    Extract representations for a token at a specific position in a sequence.
+
+    Args:
+        model: LlamaForCausalLM model
+        sequence_token_ids: list of token IDs
+        target_position: int, position in sequence to extract (0-indexed)
+        representations: list of representation types to extract
+
+    Returns:
+        dict with representations for each layer (each value shape [dim])
+    """
+    extractor = RepresentationExtractor(model, representations)
+    extractor.register_hooks()
+
+    input_ids = torch.tensor([sequence_token_ids], dtype=torch.long)
+
+    with torch.no_grad():
+        outputs = model(
+            input_ids=input_ids,
+            output_hidden_states=True
+        )
+
+    reps = extractor.representations.copy()
+    extractor.remove_hooks()
+
+    batch_size, seq_len = input_ids.shape
+    token_reps = {}
+
+    for key, value in reps.items():
+        if value.dim() == 3:
+            token_reps[key] = value[0, target_position, :].detach().cpu()
+        elif value.dim() == 2:
+            if value.shape[0] == batch_size * seq_len:
+                reshaped = value.view(batch_size, seq_len, -1)
+                token_reps[key] = reshaped[0, target_position, :].detach().cpu()
+            elif value.shape[0] == seq_len:
+                token_reps[key] = value[target_position, :].detach().cpu()
+            else:
+                token_reps[key] = value[0, :].detach().cpu() if value.shape[0] >= 1 else value.squeeze().detach().cpu()
+        else:
+            token_reps[key] = value.detach().cpu()
+
+    token_reps['input_embeds'] = outputs.hidden_states[0][0, target_position, :].detach().cpu()
+    token_reps['final_hidden'] = outputs.hidden_states[-1][0, target_position, :].detach().cpu()
+
+    return token_reps
+
+
+def build_token_occurrence_index(dataset_split, token_ids_set, seed=42):
+    """
+    Build index: for each token_id, list of (seq_idx, position) where token appears.
+
+    Returns:
+        dict: token_id -> list of (seq_idx, position)
+    """
+    token_occurrences = defaultdict(list)
+    for seq_idx in tqdm(range(len(dataset_split)), desc="Indexing token occurrences"):
+        example = dataset_split[seq_idx]
+        ids = example.get('input_ids', example.get('input_id', []))
+        if isinstance(ids, torch.Tensor):
+            ids = ids.tolist()
+        for pos, tid in enumerate(ids):
+            if tid in token_ids_set:
+                token_occurrences[tid].append((seq_idx, pos))
+    return dict(token_occurrences)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Extract token representations',
@@ -191,8 +267,19 @@ Examples:
                       default=['after_block'],
                       choices=['residual_before', 'after_attention', 'after_block', 'ffn_gate', 'ffn_up'],
                       help='Representation types to extract (default: after_block)')
+    parser.add_argument('--upsample', action='store_true',
+                      help='Upsample: for each token sample N sequences containing it and average (requires --dataset_dir)')
+    parser.add_argument('--upsample_n', type=int, default=8,
+                      help='Number of context sequences to sample per token when upsampling (default: 8)')
+    parser.add_argument('--dataset_dir', type=str, default=None,
+                      help='Dataset directory (HuggingFace load_from_disk); required when --upsample')
+    parser.add_argument('--seed', type=int, default=42,
+                      help='Random seed for sampling upsampling contexts (default: 42)')
     
     args = parser.parse_args()
+    
+    if args.upsample and not args.dataset_dir:
+        parser.error('--dataset_dir is required when --upsample is set')
     
     # Create output directory
     output_dir = Path(args.output_dir)
@@ -244,39 +331,103 @@ Examples:
     if 'ffn_up' in args.representations:
         print("  - ffn_up: FFN up projection activations")
     
-    # Extract representations for each token
-    print(f"\n{'='*60}")
-    print("Extracting token representations...")
-    print(f"{'='*60}\n")
+    token_ids_set = set(token_ids)
+    rng = random.Random(args.seed)
     
-    all_representations = defaultdict(list)
-    token_metadata = []
-    
-    for token_id in tqdm(token_ids, desc="Processing tokens"):
-        # Extract representations for this token
-        token_reps = extract_token_representations(model, token_id, args.representations)
+    if args.upsample:
+        # Load dataset and build token -> (seq_idx, position) index
+        print(f"\nUpsampling enabled: N={args.upsample_n} sequences per token (seed={args.seed})")
+        print(f"Loading dataset from {args.dataset_dir}")
+        dataset = load_from_disk(args.dataset_dir)
+        split = dataset['train'] if 'train' in dataset else dataset[list(dataset.keys())[0]]
+        print(f"  Split size: {len(split)} sequences")
+        token_occurrences = build_token_occurrence_index(split, token_ids_set, seed=args.seed)
+        missing = [tid for tid in token_ids if not token_occurrences.get(tid)]
+        if missing:
+            print(f"  Warning: {len(missing)} tokens never appear in dataset; will use single-token extraction for those")
         
-        # Store representations
-        for key, value in token_reps.items():
-            all_representations[key].append(value.numpy())
+        print(f"\n{'='*60}")
+        print("Extracting token representations (upsampled)...")
+        print(f"{'='*60}\n")
         
-        # Store metadata
-        token_metadata.append({
-            'token_id': int(token_id),
-            'token_str': str(token_id)
-        })
+        all_representations = defaultdict(list)
+        all_raw_representations = defaultdict(list)  # per-token list of [N, dim] -> stack to [vocab_size, N, dim]
+        token_metadata = []
+        
+        for token_id in tqdm(token_ids, desc="Processing tokens"):
+            occurrences = token_occurrences.get(token_id, [])
+            if len(occurrences) == 0:
+                # Fallback: single-token extraction; repeat to [N, dim] for consistent raw shape
+                token_reps = extract_token_representations(model, token_id, args.representations)
+                for key, value in token_reps.items():
+                    v = value.numpy()
+                    all_representations[key].append(v)
+                    all_raw_representations[key].append(np.broadcast_to(v[np.newaxis, :], (args.upsample_n, v.shape[0])))  # [N, dim]
+            else:
+                # Sample N (with replacement if fewer than N occurrences)
+                if len(occurrences) >= args.upsample_n:
+                    chosen = rng.sample(occurrences, args.upsample_n)
+                else:
+                    chosen = rng.choices(occurrences, k=args.upsample_n)
+                raw_list = defaultdict(list)
+                for seq_idx, pos in chosen:
+                    seq = split[seq_idx]['input_ids']
+                    if isinstance(seq, torch.Tensor):
+                        seq = seq.tolist()
+                    token_reps = extract_token_representations_from_sequence(
+                        model, seq, pos, args.representations
+                    )
+                    for key, value in token_reps.items():
+                        raw_list[key].append(value.numpy())
+                # Average for main representation
+                for key in raw_list:
+                    stacked = np.stack(raw_list[key], axis=0)  # [N, dim]
+                    avg = np.mean(stacked, axis=0)  # [dim]
+                    all_representations[key].append(avg)
+                    all_raw_representations[key].append(stacked)  # [N, dim]
+            token_metadata.append({'token_id': int(token_id), 'token_str': str(token_id)})
+        
+        # Convert to arrays: main [vocab_size, dim], raw [vocab_size, N, dim]
+        print(f"\nConverting to arrays...")
+        save_dict = {}
+        for key, value_list in all_representations.items():
+            save_dict[key] = np.stack(value_list)
+            print(f"  {key} (averaged): {save_dict[key].shape}")
+        raw_save_dict = {}
+        for key, value_list in all_raw_representations.items():
+            raw_save_dict[key] = np.stack(value_list)  # [vocab_size, N, dim]
+            print(f"  {key} (raw upsampled): {raw_save_dict[key].shape}")
+    else:
+        # Direct extraction: one forward per token
+        print(f"\n{'='*60}")
+        print("Extracting token representations (direct)...")
+        print(f"{'='*60}\n")
+        
+        all_representations = defaultdict(list)
+        token_metadata = []
+        
+        for token_id in tqdm(token_ids, desc="Processing tokens"):
+            token_reps = extract_token_representations(model, token_id, args.representations)
+            for key, value in token_reps.items():
+                all_representations[key].append(value.numpy())
+            token_metadata.append({'token_id': int(token_id), 'token_str': str(token_id)})
+        
+        print(f"\nConverting to arrays...")
+        save_dict = {}
+        for key, value_list in all_representations.items():
+            save_dict[key] = np.stack(value_list)
+            print(f"  {key}: {save_dict[key].shape}")
+        raw_save_dict = None
     
-    # Convert to arrays
-    print(f"\nConverting to arrays...")
-    save_dict = {}
-    for key, value_list in all_representations.items():
-        save_dict[key] = np.stack(value_list)  # [vocab_size, hidden_dim]
-        print(f"  {key}: {save_dict[key].shape}")
-    
-    # Save representations
+    # Save main representations (same filename so downstream is unchanged)
     output_file = output_dir / 'token_representations.npz'
     print(f"\nSaving representations to {output_file}")
     np.savez_compressed(output_file, **save_dict)
+    
+    if raw_save_dict is not None:
+        raw_file = output_dir / 'token_representations_upsampled_raw.npz'
+        print(f"Saving upsampled raw representations to {raw_file}")
+        np.savez_compressed(raw_file, **raw_save_dict)
     
     # Save metadata
     metadata_file = output_dir / 'token_metadata.json'
@@ -294,8 +445,14 @@ Examples:
         'intermediate_size': intermediate_size,
         'representations_extracted': args.representations,
         'representation_keys': list(save_dict.keys()),
-        'representation_shape': f'[vocab_size={vocab_size}, hidden_dim]'
+        'representation_shape': f'[vocab_size={vocab_size}, hidden_dim]',
+        'upsampled': args.upsample,
     }
+    if args.upsample:
+        summary['dataset_dir'] = str(args.dataset_dir)
+        summary['upsample_n'] = args.upsample_n
+        summary['seed'] = args.seed
+        summary['upsampled_raw_file'] = 'token_representations_upsampled_raw.npz'
     
     summary_file = output_dir / 'extraction_summary.json'
     with open(summary_file, 'w') as f:
@@ -310,6 +467,10 @@ Examples:
     print(f"\nRepresentation shapes:")
     for key, arr in save_dict.items():
         print(f"  {key}: {arr.shape}")
+    if raw_save_dict:
+        print(f"\nUpsampled raw (for visualization):")
+        for key, arr in raw_save_dict.items():
+            print(f"  {key}: {arr.shape}")
     
     print(f"\nTo analyze:")
     print(f"  python visualize_representations.py --representation_dir {output_dir}")
