@@ -100,7 +100,7 @@ def main():
 
     # Apply UMAP
     print(f"\nApplying UMAP ({args.umap_n_components}D)...")
-    umap_data, umap_info = apply_umap(
+    umap_data, umap_info, _ = apply_umap(
         distance_matrix=distance_matrix,
         n_components=args.umap_n_components,
         min_dist=args.umap_min_dist,

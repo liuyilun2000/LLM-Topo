@@ -2,10 +2,11 @@
 Data loading utility functions for PCA, UMAP, fuzzy distance matrices, trajectories, and token representations
 """
 import json
+import pickle
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Any
 
 
 def load_pca_data(pca_dir: str, key: str, use_downsampled: bool = False) -> Tuple[np.ndarray, Optional[np.ndarray]]:
@@ -37,6 +38,41 @@ def load_pca_data(pca_dir: str, key: str, use_downsampled: bool = False) -> Tupl
     selected_indices = data.get('selected_indices', None)
     
     return pca_reduced, selected_indices
+
+
+def load_upsampled_raw(representation_dir: str) -> Optional[Dict[str, np.ndarray]]:
+    """
+    Load upsampled raw representations if present (from 02b with --upsample).
+    Shape per key: [vocab_size, N, dim].
+
+    Returns:
+        Dict mapping representation names to arrays, or None if file does not exist.
+    """
+    path = Path(representation_dir) / 'token_representations_upsampled_raw.npz'
+    if not path.exists():
+        return None
+    data = np.load(path)
+    return {k: data[k] for k in data.files}
+
+
+def load_pca_model(pca_dir: str, key: str) -> Tuple[Any, Any, int]:
+    """
+    Load fitted PCA model and scaler for a representation key.
+
+    Returns:
+        pca: Fitted sklearn PCA object
+        scaler: Fitted StandardScaler
+        num_components: Number of components used (for slicing transform output)
+    """
+    pkl_file = Path(pca_dir) / f'{key}_pca_model.pkl'
+    if not pkl_file.exists():
+        raise FileNotFoundError(f"PCA model not found for {key} in {pca_dir}")
+    with open(pkl_file, 'rb') as f:
+        obj = pickle.load(f)
+    pca = obj['pca']
+    scaler = obj['scaler']
+    num_components = int(obj['pca_info']['num_components'])
+    return pca, scaler, num_components
 
 
 def load_fuzzy_distance_matrix(fuzzy_dir: str, key: str) -> Tuple[np.ndarray, Optional[np.ndarray]]:

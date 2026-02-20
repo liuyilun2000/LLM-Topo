@@ -1,5 +1,9 @@
 """
-Train a Llama model on graph walk sequences
+Train a causal LM (Llama or Mamba) on graph walk sequences.
+
+Model architecture is read from the config JSON key "architectures", e.g.:
+  "architectures": ["LlamaForCausalLM"]  or  ["MambaForCausalLM"]
+Config file is typically configs/config_${RUN_NAME}.json (e.g. config_12M_llama.json).
 """
 import argparse
 import json
@@ -9,14 +13,24 @@ from pathlib import Path
 
 from datasets import load_from_disk
 from transformers import (
+    AutoModelForCausalLM,
     AutoTokenizer,
     LlamaConfig,
     LlamaForCausalLM,
+    MambaConfig,
+    MambaForCausalLM,
     PreTrainedTokenizer,
     Trainer,
     TrainingArguments,
 )
 from torch.utils.data import Dataset
+
+
+# Map architecture name from config to (ConfigClass, ModelClass)
+ARCH_REGISTRY = {
+    "LlamaForCausalLM": (LlamaConfig, LlamaForCausalLM),
+    "MambaForCausalLM": (MambaConfig, MambaForCausalLM),
+}
 
 
 # HuggingFace tokenizer for graph walks
@@ -139,7 +153,7 @@ def count_parameters(model):
         if param.requires_grad:
             trainable_params += num_params
         
-        if 'embed_tokens' in name or 'lm_head' in name:
+        if 'embed_tokens' in name or 'embeddings' in name or 'lm_head' in name:
             embedding_params += num_params
         else:
             non_embedding_params += num_params
@@ -293,35 +307,48 @@ def main():
     
     print(f"  Final tokenizer vocab size: {len(tokenizer)}")
     
-    # Load model config
+    # Load model config and resolve architecture from "architectures" in JSON
     print(f"\nLoading config from {args.config}")
-    config = LlamaConfig.from_json_file(args.config)
+    with open(args.config, 'r') as f:
+        config_dict = json.load(f)
+    arch_list = config_dict.get("architectures", ["LlamaForCausalLM"])
+    arch = arch_list[0] if arch_list else "LlamaForCausalLM"
+    if arch not in ARCH_REGISTRY:
+        raise ValueError(
+            f"Unknown architecture '{arch}' in config. Supported: {list(ARCH_REGISTRY.keys())}. "
+            "Add \"architectures\": [\"LlamaForCausalLM\"] or [\"MambaForCausalLM\"] to your config JSON."
+        )
+    ConfigClass, ModelClass = ARCH_REGISTRY[arch]
+    print(f"  Architecture: {arch}")
+    # Build config from dict (omit 'architectures' for Config constructor)
+    config_dict = {k: v for k, v in config_dict.items() if k != "architectures"}
+    config = ConfigClass(**config_dict)
     config.vocab_size = vocab_size
-    
-    # Set max_position_embeddings if not in config
-    if not hasattr(config, 'max_position_embeddings') or config.max_position_embeddings is None:
-        config.max_position_embeddings = 2048
-    
-    # Set rope_theta if not set
-    if not hasattr(config, 'rope_theta'):
-        config.rope_theta = 10000.0
-    
+
+    if arch == "LlamaForCausalLM":
+        if not getattr(config, 'max_position_embeddings', None):
+            config.max_position_embeddings = 2048
+        if not getattr(config, 'rope_theta', None):
+            config.rope_theta = 10000.0
+
     print(f"  Hidden size: {config.hidden_size}")
     print(f"  Num layers: {config.num_hidden_layers}")
-    print(f"  Num heads: {config.num_attention_heads}")
-    print(f"  Intermediate size: {config.intermediate_size}")
-    print(f"  Max position embeddings: {config.max_position_embeddings}")
-    print(f"  Rope theta: {config.rope_theta}")
-    
+    if hasattr(config, 'num_attention_heads'):
+        print(f"  Num heads: {config.num_attention_heads}")
+    if hasattr(config, 'intermediate_size'):
+        print(f"  Intermediate size: {config.intermediate_size}")
+    if hasattr(config, 'max_position_embeddings'):
+        print(f"  Max position embeddings: {config.max_position_embeddings}")
+
     # Initialize or load model
     print(f"\nInitializing model...")
     if args.resume_from_checkpoint and os.path.exists(args.resume_from_checkpoint):
         print(f"  Loading model from checkpoint: {args.resume_from_checkpoint}")
-        model = LlamaForCausalLM.from_pretrained(args.resume_from_checkpoint)
+        model = AutoModelForCausalLM.from_pretrained(args.resume_from_checkpoint)
         print(f"  ✓ Model loaded from checkpoint")
     else:
-        model = LlamaForCausalLM(config)
-        print(f"  ✓ Model initialized from config")
+        model = ModelClass(config)
+        print(f"  ✓ Model initialized from config ({arch})")
     print(f"Model: {model}")
     
     # Count parameters

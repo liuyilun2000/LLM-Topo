@@ -53,6 +53,9 @@ Available presets in `configs/`:
 | config_2M_llama.json | ~2M | 128 | 8 | 8 | 512 |
 | config_6M_llama.json | ~6M | 256 | 6 | 8 | 1024 |
 | config_12M_llama.json | ~12M | 384 | 8 | 8 | 1536 |
+| config_12M_mamba.json | ~12M (Mamba) | 256 | 12 | — | — |
+
+Mamba configs exist for each size (e.g. `config_10K_mamba.json` … `config_50M_mamba.json`), matching the same hidden size and layer count as the corresponding Llama config. They use the default pure-Python SSM path when `mamba-ssm` is not installed.
 
 ### Output Files
 

@@ -1,0 +1,1 @@
+{"architectures":["MambaForCausalLM"],"hidden_size":16,"state_size":16,"num_hidden_layers":3,"expand":2,"conv_kernel":4}

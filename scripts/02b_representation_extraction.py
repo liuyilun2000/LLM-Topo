@@ -24,8 +24,15 @@ from pathlib import Path
 from tqdm import tqdm
 from collections import defaultdict
 
-from transformers import LlamaForCausalLM
+from transformers import AutoModelForCausalLM
 from datasets import load_from_disk
+
+
+def _get_architecture(model):
+    """Return architecture name from model config, e.g. 'LlamaForCausalLM' or 'MambaForCausalLM'."""
+    if getattr(model.config, 'architectures', None) and len(model.config.architectures) > 0:
+        return model.config.architectures[0]
+    return type(model).__name__
 
 
 class RepresentationExtractor:
@@ -120,19 +127,76 @@ class RepresentationExtractor:
         self.representations = {}
 
 
+class MambaRepresentationExtractor:
+    """
+    Extract representations from Mamba model (state-space, no attention/FFN).
+    Only supports residual_before and after_block (input/output of each backbone layer).
+    """
+
+    def __init__(self, model, representations=None):
+        self.model = model
+        self.representations = {}
+        self.hooks = []
+        allowed = {'residual_before', 'after_block'}
+        requested = set(representations or ['after_block'])
+        self.representations_to_extract = [r for r in requested if r in allowed]
+        if requested - allowed:
+            import warnings
+            warnings.warn(
+                f"Mamba does not support {requested - allowed}; only {allowed} are available. Using {self.representations_to_extract}."
+            )
+
+    def register_hooks(self):
+        layers = self.model.backbone.layers
+        for layer_idx, layer in enumerate(layers):
+            if 'residual_before' in self.representations_to_extract:
+                def _residual_before_hook(idx):
+                    def hook(module, input, output):
+                        inp = input[0] if isinstance(input, tuple) and input else input
+                        if hasattr(inp, 'detach'):
+                            self.representations[f'layer_{idx}_residual_before'] = inp.detach().cpu()
+                    return hook
+                self.hooks.append(layer.register_forward_hook(_residual_before_hook(layer_idx)))
+            if 'after_block' in self.representations_to_extract:
+                def _after_block_hook(idx):
+                    def hook(module, input, output):
+                        out = output[0] if isinstance(output, tuple) and output else output
+                        if hasattr(out, 'detach'):
+                            self.representations[f'layer_{idx}_after_block'] = out.detach().cpu()
+                    return hook
+                self.hooks.append(layer.register_forward_hook(_after_block_hook(layer_idx)))
+
+    def remove_hooks(self):
+        for h in self.hooks:
+            h.remove()
+        self.hooks = []
+
+    def clear_representations(self):
+        self.representations = {}
+
+
+def _get_extractor_class(model):
+    arch = _get_architecture(model)
+    if arch == "MambaForCausalLM":
+        return MambaRepresentationExtractor
+    return RepresentationExtractor
+
+
 def extract_token_representations(model, token_id, representations=None):
     """
-    Extract representations for a single token
-    
+    Extract representations for a single token.
+    Works for Llama (full rep types) and Mamba (residual_before, after_block only).
+
     Args:
-        model: LlamaForCausalLM model
+        model: Causal LM (LlamaForCausalLM or MambaForCausalLM)
         token_id: int, the token ID to extract
         representations: list of representation types to extract
-    
+
     Returns:
         dict with representations for each layer
     """
-    extractor = RepresentationExtractor(model, representations)
+    ExtractorClass = _get_extractor_class(model)
+    extractor = ExtractorClass(model, representations)
     extractor.register_hooks()
     
     # Create input tensor for single token
@@ -170,9 +234,10 @@ def extract_token_representations(model, token_id, representations=None):
 def extract_token_representations_from_sequence(model, sequence_token_ids, target_position, representations=None):
     """
     Extract representations for a token at a specific position in a sequence.
+    Works for Llama and Mamba (same as extract_token_representations).
 
     Args:
-        model: LlamaForCausalLM model
+        model: Causal LM (LlamaForCausalLM or MambaForCausalLM)
         sequence_token_ids: list of token IDs
         target_position: int, position in sequence to extract (0-indexed)
         representations: list of representation types to extract
@@ -180,7 +245,8 @@ def extract_token_representations_from_sequence(model, sequence_token_ids, targe
     Returns:
         dict with representations for each layer (each value shape [dim])
     """
-    extractor = RepresentationExtractor(model, representations)
+    ExtractorClass = _get_extractor_class(model)
+    extractor = ExtractorClass(model, representations)
     extractor.register_hooks()
 
     input_ids = torch.tensor([sequence_token_ids], dtype=torch.long)
@@ -304,19 +370,29 @@ Examples:
     print(f"  Vocabulary size: {vocab_size}")
     print(f"  Token IDs: {min(token_ids)} to {max(token_ids)}")
     
-    # Load model
+    # Load model (auto-detects Llama vs Mamba from saved config.json)
     print(f"\nLoading model from {args.model_dir}")
-    model = LlamaForCausalLM.from_pretrained(args.model_dir)
+    model = AutoModelForCausalLM.from_pretrained(args.model_dir)
     model.eval()
-    
-    # Get model info
-    num_layers = len(model.model.layers)
+    arch = _get_architecture(model)
+    print(f"  Architecture: {arch}")
+
+    if arch == "MambaForCausalLM":
+        num_layers = len(model.backbone.layers)
+    else:
+        num_layers = len(model.model.layers)
     hidden_size = model.config.hidden_size
-    intermediate_size = model.config.intermediate_size
-    
+    intermediate_size = getattr(model.config, 'intermediate_size', None)
+    if arch == "MambaForCausalLM":
+        args.representations = [r for r in args.representations if r in ('residual_before', 'after_block')]
+        if not args.representations:
+            args.representations = ['after_block']
+        print(f"  Mamba only supports residual_before, after_block; using: {args.representations}")
+
     print(f"  Num layers: {num_layers}")
     print(f"  Hidden size: {hidden_size}")
-    print(f"  Intermediate size: {intermediate_size}")
+    if intermediate_size is not None:
+        print(f"  Intermediate size: {intermediate_size}")
     
     print(f"\nRepresentations to extract: {args.representations}")
     print("\nRepresentation locations:")
@@ -438,6 +514,7 @@ Examples:
     # Save summary
     summary = {
         'model_dir': str(args.model_dir),
+        'architecture': arch,
         'vocab_file': str(vocab_file),
         'vocab_size': vocab_size,
         'num_layers': num_layers,

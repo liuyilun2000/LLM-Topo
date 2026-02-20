@@ -15,14 +15,14 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# CONFIG, OUTPUT_DIR, EPOCHS, BATCH_SIZE, GRAD_ACCUM, LEARNING_RATE, MAX_LENGTH, SAVE_STEPS, EVAL_STEPS, LOGGING_STEPS, SAVE_TOTAL_LIMIT, USE_CPU from 00_config_env.sh
-CONFIG="${CONFIG:-configs/config_${RUN_NAME}.json}"
+# CONFIG (from RUN_NAME), OUTPUT_DIR, EPOCHS, ... from 00_config_env.sh
 OUTPUT_DIR="${OUTPUT_DIR:-./${WORK_DIR}}"
 LOG_DIR="${LOG_DIR:-${OUTPUT_DIR}}"
 
 echo ""
 echo "Configuration:"
-echo "  Model config: $CONFIG"
+echo "  Run name: $RUN_NAME"
+echo "  Model config: $CONFIG (from 00_config_env; set CONFIG or RUN_NAME to override)"
 echo "  Dataset dir: $DATASET_DIR"
 echo "  Output dir: $OUTPUT_DIR"
 echo "  Epochs: $EPOCHS"

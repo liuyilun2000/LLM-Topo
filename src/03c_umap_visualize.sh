@@ -4,7 +4,12 @@
 #
 # This script applies UMAP (Uniform Manifold Approximation and Projection) to
 # reduce the dimensionality of the token representations and generate 2D/3D
-# visualizations. It supports two input modes:
+# visualizations. UMAP is always fit on the pooled (averaged) data. When
+# upsampled raw representations exist (from 02b with upsampling), PCA-mode
+# runs additionally visualize all points (pooled + upsampled raw) in the same
+# UMAP space. Fuzzy mode visualizes pooled only.
+#
+# Input modes:
 #   - Fuzzy neighborhood distance matrices (USE_FUZZY=true) [default]
 #   - Regular PCA data (USE_FUZZY=false)
 
@@ -18,8 +23,8 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# USE_FUZZY, UMAP_*, SAVE_UMAP_RESULT, GENERATE_VISUALIZATIONS from 00_config_env.sh (03c uses UMAP_VIS_N_COMPONENTS)
-UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-${UMAP_VIS_N_COMPONENTS}}"
+# USE_FUZZY, UMAP_*, SAVE_UMAP_RESULT, GENERATE_VISUALIZATIONS from 00_config_env.sh (03c uses UMAP_N_COMPONENTS_VIS)
+UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-${UMAP_N_COMPONENTS_VIS}}"
 OUTPUT_DIR="${OUTPUT_DIR:-${UMAP_VIS_RESULT_DIR}}"
 
 echo ""

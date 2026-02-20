@@ -31,7 +31,7 @@ def apply_umap(
     metric: str = 'precomputed',
     random_state: Optional[int] = None,
     **kwargs
-) -> Tuple[np.ndarray, dict]:
+) -> Tuple[np.ndarray, dict, object]:
     """
     Apply UMAP dimensionality reduction.
     
@@ -48,6 +48,7 @@ def apply_umap(
     Returns:
         reduced_data: UMAP-transformed data
         info: Information dictionary
+        reducer: Fitted UMAP reducer (use .transform() for new points only when metric != 'precomputed')
     """
     if not HAS_UMAP:
         raise ImportError("UMAP not installed. Install with: pip install umap-learn")
@@ -96,7 +97,7 @@ def apply_umap(
         'random_state': random_state
     }
     
-    return reduced, info
+    return reduced, info, umap_reducer
 
 
 def create_3d_scatter_plot(

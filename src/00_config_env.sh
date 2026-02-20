@@ -46,7 +46,7 @@ export SEED=${SEED:-42}
 
 # --- Random walks (01b) ---
 export MAX_LENGTH=${MAX_LENGTH:-128}
-export MAX_SEQS=${MAX_SEQS:-120000}
+export MAX_SEQS=${MAX_SEQS:-1200000}
 export MIN_VISITS_PER_NODE=${MIN_VISITS_PER_NODE:-10000000000}
 export NO_REPEAT_WINDOW=${NO_REPEAT_WINDOW:-32}
 export RESTART_PROB=${RESTART_PROB:-0}
@@ -61,7 +61,7 @@ export TRAIN_SPLIT=${TRAIN_SPLIT:-0.95}
 
 # --- Graph UMAP (01d: 3D viz, 01e: higher-dim for topology) ---
 export MATRIX_TYPE=${MATRIX_TYPE:-auto}
-export GRAPH_UMAP_N_COMPONENTS_3D=${GRAPH_UMAP_N_COMPONENTS_3D:-3}
+export GRAPH_UMAP_N_COMPONENTS_VIS=${GRAPH_UMAP_N_COMPONENTS_VIS:-3}
 export GRAPH_UMAP_N_COMPONENTS_TOPOLOGY=${GRAPH_UMAP_N_COMPONENTS_TOPOLOGY:-6}
 export GRAPH_UMAP_MIN_DIST=${GRAPH_UMAP_MIN_DIST:-0.2}
 export GRAPH_UMAP_N_NEIGHBORS=${GRAPH_UMAP_N_NEIGHBORS:-20}
@@ -75,7 +75,7 @@ export RIPSER_COEFF=${RIPSER_COEFF:-3}
 
 # --- Persistence barcode (01g, 04b) ---
 export MAX_BARS=${MAX_BARS:-20}
-export TOP_K=${TOP_K:-8}
+export TOP_K=${TOP_K:-4}
 
 # =============================================================================
 # 4. MODEL TRAINING & EXTRACTION (02a, 02b)
@@ -117,8 +117,8 @@ export TARGET_ENTROPY=${TARGET_ENTROPY:-auto}
 
 # --- UMAP on model (03c: vis 2D/3D, 03d: topology e.g. 10D) ---
 export USE_FUZZY=${USE_FUZZY:-true}
-export UMAP_VIS_N_COMPONENTS=${UMAP_VIS_N_COMPONENTS:-3}
-export UMAP_TOPOLOGY_N_COMPONENTS=${UMAP_TOPOLOGY_N_COMPONENTS:-6}
+export UMAP_N_COMPONENTS_VIS=${UMAP_N_COMPONENTS_VIS:-3}
+export UMAP_N_COMPONENTS_TOPOLOGY=${UMAP_N_COMPONENTS_TOPOLOGY:-6}
 export UMAP_MIN_DIST=${UMAP_MIN_DIST:-0.2}
 export UMAP_N_NEIGHBORS=${UMAP_N_NEIGHBORS:-20}
 export UMAP_METRIC=${UMAP_METRIC:-cosine}
@@ -159,6 +159,8 @@ fi
 # Base: results/{DATASET_NAME}/ ; run-specific: results/{DATASET_NAME}/{RUN_NAME}/
 
 export RUN_NAME=${RUN_NAME:-"12M_llama"}
+# Model config JSON (by run name); set CONFIG to override. Must include "architectures": ["LlamaForCausalLM"] or ["MambaForCausalLM"].
+export CONFIG="${CONFIG:-configs/config_${RUN_NAME}.json}"
 
 export DATA_DIR="results/${DATASET_NAME}"
 export GRAPH_DIR="${GRAPH_DIR:-${DATA_DIR}/graph}"
@@ -170,8 +172,8 @@ export WORK_DIR="${DATA_DIR}/${RUN_NAME}"
 export MODEL_DIR="${MODEL_DIR:-${WORK_DIR}/final_model}"
 
 # UMAP result dirs (folder name = umap_result_{N}d from config dimension)
-export UMAP_VIS_RESULT_DIR="${UMAP_VIS_RESULT_DIR:-${MODEL_DIR}/umap_result_${UMAP_VIS_N_COMPONENTS}d}"
-export TOPOLOGY_UMAP_RESULT_DIR="${TOPOLOGY_UMAP_RESULT_DIR:-${MODEL_DIR}/umap_result_${UMAP_TOPOLOGY_N_COMPONENTS}d}"
+export UMAP_VIS_RESULT_DIR="${UMAP_VIS_RESULT_DIR:-${MODEL_DIR}/umap_result_${UMAP_N_COMPONENTS_VIS}d}"
+export TOPOLOGY_UMAP_RESULT_DIR="${TOPOLOGY_UMAP_RESULT_DIR:-${MODEL_DIR}/umap_result_${UMAP_N_COMPONENTS_TOPOLOGY}d}"
 export GRAPH_UMAP_TOPOLOGY_RESULT_DIR="${GRAPH_UMAP_TOPOLOGY_RESULT_DIR:-${DATA_DIR}/graph_umap_result_${GRAPH_UMAP_N_COMPONENTS_TOPOLOGY}d}"
 
 export REPRESENTATION_DIR="${REPRESENTATION_DIR:-${MODEL_DIR}/token_representations}"

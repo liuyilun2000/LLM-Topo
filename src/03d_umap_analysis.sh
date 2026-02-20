@@ -18,10 +18,13 @@ echo "=========================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/00_config_env.sh"
 
-# USE_FUZZY, UMAP_*, SAVE_UMAP_RESULT, GENERATE_VISUALIZATIONS from 00_config_env.sh (03d uses UMAP_TOPOLOGY_N_COMPONENTS)
-UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-${UMAP_TOPOLOGY_N_COMPONENTS}}"
-# 03d typically does not generate 2D/3D plots
+# USE_FUZZY, UMAP_*, SAVE_UMAP_RESULT, GENERATE_VISUALIZATIONS from 00_config_env.sh (03d uses UMAP_N_COMPONENTS_TOPOLOGY)
+UMAP_N_COMPONENTS="${UMAP_N_COMPONENTS:-${UMAP_N_COMPONENTS_TOPOLOGY}}"
+# 03d typically uses 6D; only generate plots when 2D/3D (Python rejects visualization for higher dims)
 GENERATE_VISUALIZATIONS="${GENERATE_VISUALIZATIONS:-false}"
+if [ "$GENERATE_VISUALIZATIONS" = "true" ] && [ "$UMAP_N_COMPONENTS" -ne 2 ] && [ "$UMAP_N_COMPONENTS" -ne 3 ]; then
+    GENERATE_VISUALIZATIONS="false"
+fi
 OUTPUT_DIR="${OUTPUT_DIR:-${TOPOLOGY_UMAP_RESULT_DIR}}"
 
 echo ""
@@ -49,7 +52,7 @@ else
     echo "  UMAP random_state: (random)"
 fi
 echo "  Save UMAP result: $SAVE_UMAP_RESULT"
-echo "  Generate visualizations: $GENERATE_VISUALIZATIONS"
+echo "  Generate visualizations: $GENERATE_VISUALIZATIONS (only for 2D/3D UMAP)"
 echo ""
 
 # Check if results exist

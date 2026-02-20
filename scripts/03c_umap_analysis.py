@@ -1,14 +1,22 @@
 """
-Apply UMAP and visualize dimensionality reduction results
-Can work with either PCA or downsampled PCA data
-Similar to manifold.ipynb visualization
+Apply UMAP and visualize dimensionality reduction results.
+UMAP is fit on pooled (averaged) data only. When upsampled raw representations
+exist (token_representations_upsampled_raw.npz) and input is PCA (not fuzzy),
+visualizations include all points: pooled plus upsampled raw, transformed
+into the same UMAP space via the fitted reducer.
 """
 import argparse
 import json
 import numpy as np
 from pathlib import Path
 
-from data_loading_utils import load_pca_data, load_fuzzy_distance_matrix, load_representations
+from data_loading_utils import (
+    load_pca_data,
+    load_fuzzy_distance_matrix,
+    load_representations,
+    load_upsampled_raw,
+    load_pca_model,
+)
 from visualization_utils import apply_umap, visualize_reduction_result
 
 
@@ -158,9 +166,9 @@ def main():
                 # Use all token_ids (no downsampling with fuzzy neighborhood)
                 token_ids_subset = token_ids
                 
-                # Apply UMAP with precomputed distance matrix
+                # Apply UMAP with precomputed distance matrix (no transform for new points)
                 print("\nApplying UMAP with precomputed distance matrix...")
-                umap_data, umap_info = apply_umap(
+                umap_data, umap_info, _ = apply_umap(
                     distance_matrix=distance_matrix,
                     n_components=args.umap_n_components,
                     min_dist=args.umap_min_dist,
@@ -182,9 +190,9 @@ def main():
                 else:
                     token_ids_subset = token_ids
                 
-                # Apply UMAP
+                # Apply UMAP (reducer can transform new points for "visualize all")
                 print("\nApplying UMAP...")
-                umap_data, umap_info = apply_umap(
+                umap_data, umap_info, umap_reducer = apply_umap(
                     data=pca_data,
                     n_components=args.umap_n_components,
                     min_dist=args.umap_min_dist,
@@ -225,13 +233,33 @@ def main():
                 print(f"  Shape: {umap_data.shape[0]} points × {umap_data.shape[1]} dimensions")
                 print(f"  Info saved to: {info_file.name}")
             
-            # Visualize if requested
+            # Visualize if requested (pooled only for fuzzy; pooled + upsampled raw for PCA when available)
             if args.generate_visualizations:
                 print("\nGenerating visualizations...")
+                viz_data = umap_data
+                viz_token_ids = token_ids_subset
+                if not args.use_fuzzy:
+                    raw_dict = load_upsampled_raw(args.representation_dir)
+                    if raw_dict is not None and key in raw_dict:
+                        raw_arr = raw_dict[key]  # [vocab_size, N, dim]
+                        if selected_indices is not None:
+                            raw_arr = raw_arr[selected_indices]  # [n_selected, N, dim]
+                        V, N, _ = raw_arr.shape
+                        raw_flat = raw_arr.reshape(-1, raw_arr.shape[2])  # [V*N, dim]
+                        pca_model, scaler, n_comp = load_pca_model(args.pca_dir, key)
+                        raw_std = scaler.transform(raw_flat)
+                        raw_pca = pca_model.transform(raw_std)[:, :n_comp]
+                        raw_umap = umap_reducer.transform(raw_pca)
+                        viz_data = np.vstack((umap_data, raw_umap))
+                        viz_token_ids = np.concatenate([
+                            token_ids_subset,
+                            np.repeat(token_ids_subset, N)
+                        ])
+                        print(f"  Visualizing all: {umap_data.shape[0]} pooled + {raw_umap.shape[0]} upsampled = {viz_data.shape[0]} points")
                 visualize_reduction_result(
                     key=key,
-                    reduced_data=umap_data,
-                    token_ids=token_ids_subset,
+                    reduced_data=viz_data,
+                    token_ids=viz_token_ids,
                     output_dir=args.output_dir
                 )
             
