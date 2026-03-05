@@ -18,6 +18,10 @@
 # =============================================================================
 # 1. GRAPH CONSTRUCTION (01a)
 # =============================================================================
+# All variables below are read by 01a_graph_generation.sh and passed to
+# scripts/01a_graph_generation.py. Override inline or before sourcing:
+#   TOPOLOGY_RULE=abAB N_TOTAL=500 ./01a_graph_generation.sh
+#   source 00_config_env.sh && MAX_ITERS=500 ./01a_graph_generation.sh
 
 # --- Topology ---
 # Gluing rule: lowercase = forward edge, uppercase = reverse (A = a^-1).
@@ -28,16 +32,31 @@ export TOPOLOGY_RULE=${TOPOLOGY_RULE:-"abAB"}
 # export TOPOLOGY_RULE=${TOPOLOGY_RULE:-"abABcdCDefEF"}
 export TOPOLOGY_PREFIX=${TOPOLOGY_PREFIX:-"torus"}
 
-# --- Evolution (repulsive force on manifold) ---
+# --- Points ---
+# N_TOTAL: number of points (omit to auto from DENSITY_FACTOR).
 export N_TOTAL=${N_TOTAL:-1200}
-export ITERS=${ITERS:-200}
-export STEP_SIZE=${STEP_SIZE:-0.05}
+export DENSITY_FACTOR=${DENSITY_FACTOR:-1.0}
 
-# --- Tiling (cross-boundary neighbors; more layers = more memory) ---
+# --- Lloyd relaxation: stop when mean move < CONVERGENCE_TOL or MAX_ITERS ---
+export MAX_ITERS=${MAX_ITERS:-5000}
+export CONVERGENCE_TOL=${CONVERGENCE_TOL:-1e-6}
+export LLOYD_STEP_SIZE=${LLOYD_STEP_SIZE:-1.0}
+export TARGET_DEGREE=${TARGET_DEGREE:-6}
+export NOISE_STRENGTH=${NOISE_STRENGTH:-0.005}
+export NOISE_DECAY_POWER=${NOISE_DECAY_POWER:-2.0}
+
+# --- Tiling (cross-boundary neighbors; more layers = more accurate, more memory) ---
+# TILING_LAYERS: depth of the tiled-copy BFS used to detect neighbours that cross
+#                glued edges. 1 is usually sufficient for torus/Klein; use 2-3 for
+#                higher-genus surfaces or very small N_TOTAL.
 export TILING_LAYERS=${TILING_LAYERS:-1}
 
 # --- Visualization & randomness ---
-export PLOT_INTERVAL=${PLOT_INTERVAL:-20}
+# PLOT_INTERVAL: save an evolution snapshot (graph + degree histogram) every N steps.
+# LOG_INTERVAL:  print progress (delta, degree stats) every N steps.
+# SEED:          random seed for point sampling and jitter (reproducibility).
+export PLOT_INTERVAL=${PLOT_INTERVAL:-100}
+export LOG_INTERVAL=${LOG_INTERVAL:-10}
 export SEED=${SEED:-42}
 
 # =============================================================================
@@ -148,9 +167,9 @@ if [ -z "${TOPOLOGY_PREFIX}" ]; then
     export TOPOLOGY_PREFIX
 fi
 
-# Dataset name: {prefix}_{rule}_N{points}_iter{iters}
-if [ -n "${N_TOTAL}" ] && [ -n "${ITERS}" ] && [ -n "${TOPOLOGY_RULE}" ] && [ -n "${TOPOLOGY_PREFIX}" ]; then
-    export DATASET_NAME="${TOPOLOGY_PREFIX}_${TOPOLOGY_RULE}_N${N_TOTAL}_iter${ITERS}"
+# Dataset name: {prefix}_{rule}_N{points}_iter{max_iters}
+if [ -n "${N_TOTAL}" ] && [ -n "${MAX_ITERS}" ] && [ -n "${TOPOLOGY_RULE}" ] && [ -n "${TOPOLOGY_PREFIX}" ]; then
+    export DATASET_NAME="${TOPOLOGY_PREFIX}_${TOPOLOGY_RULE}_N${N_TOTAL}_iter${MAX_ITERS}"
 fi
 
 # =============================================================================
@@ -192,7 +211,7 @@ if [ "${VERBOSE_CONFIG:-0}" = "1" ]; then
     echo "TOPO Configuration Summary"
     echo "============================================"
     echo "Topology:      ${TOPOLOGY_RULE} (${TOPOLOGY_PREFIX}, $(echo -n ${TOPOLOGY_RULE} | wc -c)-gon)"
-    echo "Evolution:     N=${N_TOTAL} iter=${ITERS} step=${STEP_SIZE} layers=${TILING_LAYERS}"
+    echo "Evolution:     N=${N_TOTAL} max_iters=${MAX_ITERS} layers=${TILING_LAYERS}"
     echo "Plot/seed:     interval=${PLOT_INTERVAL} seed=${SEED}"
     echo "Dataset:       ${DATASET_NAME}"
     echo "Paths:         DATA_DIR=${DATA_DIR} MODEL_DIR=${MODEL_DIR}"
