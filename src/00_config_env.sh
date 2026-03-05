@@ -83,9 +83,9 @@ export TOP_K=${TOP_K:-4}
 
 # --- Training (02a); CONFIG default set in 02a script (uses RUN_NAME) ---
 export EPOCHS=${EPOCHS:-1}
-export BATCH_SIZE=${BATCH_SIZE:-10}
+export BATCH_SIZE=${BATCH_SIZE:-16}
 export GRAD_ACCUM=${GRAD_ACCUM:-1}
-export LEARNING_RATE=${LEARNING_RATE:-5e-4}
+export LEARNING_RATE=${LEARNING_RATE:-1e-3}
 export SAVE_STEPS=${SAVE_STEPS:-1000}
 export EVAL_STEPS=${EVAL_STEPS:-20}
 export LOGGING_STEPS=${LOGGING_STEPS:-1}
